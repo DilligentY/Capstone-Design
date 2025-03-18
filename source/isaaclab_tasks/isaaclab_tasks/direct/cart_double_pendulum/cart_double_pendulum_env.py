@@ -92,6 +92,8 @@ class CartDoublePendulumEnv(DirectMARLEnv):
         self.actions = actions
 
     def _apply_action(self) -> None:
+        # Cart : Force
+        # Pendulum : Moment
         self.robot.set_joint_effort_target(
             self.actions["cart"] * self.cfg.cart_action_scale, joint_ids=self._cart_dof_idx
         )

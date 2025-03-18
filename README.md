@@ -102,4 +102,3 @@ Isaac Lab development initiated from the [Orbit](https://isaac-orbit.github.io/)
 =======
 # Capstone-Design
 Multi-Agent Reinforcement Learning for Capstone Design Project
->>>>>>> d5196f92da74bd6e69f2f792b34838038fb5b908

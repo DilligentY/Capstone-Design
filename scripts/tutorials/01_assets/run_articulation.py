@@ -82,6 +82,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
     # Define simulation stepping
     sim_dt = sim.get_physics_dt()
     count = 0
+
     # Simulation loop
     while simulation_app.is_running():
         # Reset
@@ -103,6 +104,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             # clear internal buffers
             robot.reset()
             print("[INFO]: Resetting robot state...")
+
         # Apply random action
         # -- generate random joint efforts
         efforts = torch.randn_like(robot.data.joint_pos) * 5.0
@@ -125,13 +127,17 @@ def main():
     sim = SimulationContext(sim_cfg)
     # Set main camera
     sim.set_camera_view([2.5, 0.0, 4.0], [0.0, 0.0, 2.0])
+
     # Design scene
     scene_entities, scene_origins = design_scene()
     scene_origins = torch.tensor(scene_origins, device=sim.device)
+
     # Play the simulator
     sim.reset()
+
     # Now we are ready!
     print("[INFO]: Setup complete...")
+    
     # Run the simulator
     run_simulator(sim, scene_entities, scene_origins)
 
