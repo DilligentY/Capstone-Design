@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ![Isaac Lab](docs/source/_static/isaaclab.jpg)
 
 ---
@@ -98,3 +99,6 @@ Isaac Lab development initiated from the [Orbit](https://isaac-orbit.github.io/)
    doi={10.1109/LRA.2023.3270034}
 }
 ```
+=======
+# Capstone-Design
+Multi-Agent Reinforcement Learning for Capstone Design Project

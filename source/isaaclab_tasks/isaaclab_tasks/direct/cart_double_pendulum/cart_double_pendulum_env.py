@@ -92,6 +92,8 @@ class CartDoublePendulumEnv(DirectMARLEnv):
         self.actions = actions
 
     def _apply_action(self) -> None:
+        # Cart : Force
+        # Pendulum : Moment
         self.robot.set_joint_effort_target(
             self.actions["cart"] * self.cfg.cart_action_scale, joint_ids=self._cart_dof_idx
         )
@@ -99,6 +101,11 @@ class CartDoublePendulumEnv(DirectMARLEnv):
             self.actions["pendulum"] * self.cfg.pendulum_action_scale, joint_ids=self._pendulum_dof_idx
         )
 
+    # Hi !
+    # Commit 3
+    # Commit 4
+    # Commit 1
+    # Commit 2
     def _get_observations(self) -> dict[str, torch.Tensor]:
         pole_joint_pos = normalize_angle(self.joint_pos[:, self._pole_dof_idx[0]].unsqueeze(dim=1))
         pendulum_joint_pos = normalize_angle(self.joint_pos[:, self._pendulum_dof_idx[0]].unsqueeze(dim=1))

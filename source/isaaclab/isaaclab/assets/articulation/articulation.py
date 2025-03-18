@@ -944,9 +944,11 @@ class Articulation(AssetBase):
             env_ids = slice(None)
         if joint_ids is None:
             joint_ids = slice(None)
+            
         # broadcast env_ids if needed to allow double indexing
         if env_ids != slice(None) and joint_ids != slice(None):
             env_ids = env_ids[:, None]
+
         # set targets
         self._data.joint_effort_target[env_ids, joint_ids] = target
 

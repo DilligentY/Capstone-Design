@@ -280,11 +280,13 @@ class FrankaCabinetEnv(DirectRLEnv):
     # pre-physics step calls
 
     def _pre_physics_step(self, actions: torch.Tensor):
+        # RL Agent의 행동 (제어 입력)을 기반으로 Robot 각 관절의 Target Position 계산
         self.actions = actions.clone().clamp(-1.0, 1.0)
         targets = self.robot_dof_targets + self.robot_dof_speed_scales * self.dt * self.actions * self.cfg.action_scale
         self.robot_dof_targets[:] = torch.clamp(targets, self.robot_dof_lower_limits, self.robot_dof_upper_limits)
 
     def _apply_action(self):
+        # 계산된 Target Position과 현재 robot의 Position을 기반으로 Position Controller Class 이용, 토크 신호 생성
         self._robot.set_joint_position_target(self.robot_dof_targets)
 
     # post-physics step calls

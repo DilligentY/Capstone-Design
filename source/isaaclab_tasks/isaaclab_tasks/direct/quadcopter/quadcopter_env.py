@@ -48,7 +48,7 @@ class QuadcopterEnvWindow(BaseEnvWindow):
 
 @configclass
 class QuadcopterEnvCfg(DirectRLEnvCfg):
-    # env
+    # env information
     episode_length_s = 10.0
     decimation = 2
     action_space = 4
@@ -58,7 +58,7 @@ class QuadcopterEnvCfg(DirectRLEnvCfg):
 
     ui_window_class_type = QuadcopterEnvWindow
 
-    # simulation
+    # simulation configuration
     sim: SimulationCfg = SimulationCfg(
         dt=1 / 100,
         render_interval=decimation,
@@ -84,10 +84,10 @@ class QuadcopterEnvCfg(DirectRLEnvCfg):
         debug_vis=False,
     )
 
-    # scene
+    # scene configuration
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=2.5, replicate_physics=True)
 
-    # robot
+    # robot configuration
     robot: ArticulationCfg = CRAZYFLIE_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     thrust_to_weight = 1.9
     moment_scale = 0.01
@@ -130,6 +130,8 @@ class QuadcopterEnv(DirectRLEnv):
         self.set_debug_vis(self.cfg.debug_vis)
 
     def _setup_scene(self):
+        # 하나의 환경을 구성하는 객체들 모두 스폰
+        # 병렬 환경 복제 등..
         self._robot = Articulation(self.cfg.robot)
         self.scene.articulations["robot"] = self._robot
 
@@ -143,14 +145,17 @@ class QuadcopterEnv(DirectRLEnv):
         light_cfg.func("/World/Light", light_cfg)
 
     def _pre_physics_step(self, actions: torch.Tensor):
+        # Action을 어떻게 처리할 것인가?
         self._actions = actions.clone().clamp(-1.0, 1.0)
         self._thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self._actions[:, 0] + 1.0) / 2.0
         self._moment[:, 0, :] = self.cfg.moment_scale * self._actions[:, 1:]
 
     def _apply_action(self):
+        # 정의된 Action을 실제 시뮬레이션에 적용
         self._robot.set_external_force_and_torque(self._thrust, self._moment, body_ids=self._body_id)
 
     def _get_observations(self) -> dict:
+        # Observation Space 세팅
         desired_pos_b, _ = subtract_frame_transforms(
             self._robot.data.root_state_w[:, :3], self._robot.data.root_state_w[:, 3:7], self._desired_pos_w
         )
@@ -167,6 +172,7 @@ class QuadcopterEnv(DirectRLEnv):
         return observations
 
     def _get_rewards(self) -> torch.Tensor:
+        # Reward 세팅
         lin_vel = torch.sum(torch.square(self._robot.data.root_lin_vel_b), dim=1)
         ang_vel = torch.sum(torch.square(self._robot.data.root_ang_vel_b), dim=1)
         distance_to_goal = torch.linalg.norm(self._desired_pos_w - self._robot.data.root_pos_w, dim=1)
@@ -183,11 +189,13 @@ class QuadcopterEnv(DirectRLEnv):
         return reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
+        # 에피소드 종료조건 체크
         time_out = self.episode_length_buf >= self.max_episode_length - 1
         died = torch.logical_or(self._robot.data.root_pos_w[:, 2] < 0.1, self._robot.data.root_pos_w[:, 2] > 2.0)
         return died, time_out
 
     def _reset_idx(self, env_ids: torch.Tensor | None):
+        # 에피소드 초기화
         if env_ids is None or len(env_ids) == self.num_envs:
             env_ids = self._robot._ALL_INDICES
 
@@ -202,6 +210,7 @@ class QuadcopterEnv(DirectRLEnv):
             self._episode_sums[key][env_ids] = 0.0
         self.extras["log"] = dict()
         self.extras["log"].update(extras)
+
         extras = dict()
         extras["Episode_Termination/died"] = torch.count_nonzero(self.reset_terminated[env_ids]).item()
         extras["Episode_Termination/time_out"] = torch.count_nonzero(self.reset_time_outs[env_ids]).item()
