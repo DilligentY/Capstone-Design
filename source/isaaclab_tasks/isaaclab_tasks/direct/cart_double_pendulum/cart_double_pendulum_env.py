@@ -101,6 +101,9 @@ class CartDoublePendulumEnv(DirectMARLEnv):
             self.actions["pendulum"] * self.cfg.pendulum_action_scale, joint_ids=self._pendulum_dof_idx
         )
 
+    # Hi !
+    # Commit 3
+    # Commit 4
     # Commit 1
     # Commit 2
     def _get_observations(self) -> dict[str, torch.Tensor]:
