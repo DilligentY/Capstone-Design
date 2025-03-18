@@ -101,6 +101,8 @@ class CartDoublePendulumEnv(DirectMARLEnv):
             self.actions["pendulum"] * self.cfg.pendulum_action_scale, joint_ids=self._pendulum_dof_idx
         )
 
+    # Commit 1
+    # Commit 2
     def _get_observations(self) -> dict[str, torch.Tensor]:
         pole_joint_pos = normalize_angle(self.joint_pos[:, self._pole_dof_idx[0]].unsqueeze(dim=1))
         pendulum_joint_pos = normalize_angle(self.joint_pos[:, self._pendulum_dof_idx[0]].unsqueeze(dim=1))
