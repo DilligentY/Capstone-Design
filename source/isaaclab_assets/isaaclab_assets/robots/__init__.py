@@ -17,6 +17,7 @@ from .humanoid import *
 from .humanoid_28 import *
 from .kinova import *
 from .quadcopter import *
+from .tello_approx import *
 from .ridgeback_franka import *
 from .sawyer import *
 from .shadow_hand import *

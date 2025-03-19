@@ -29,7 +29,7 @@ NUCLEUS_USER_ROOT_DIR = "omniverse://localhost"
 NVIDIA_NUCLEUS_DIR = f"{NUCLEUS_ASSET_ROOT_DIR}/NVIDIA"
 """Path to the root directory on the NVIDIA Nucleus Server."""
 
-NVIDIA_NUCLEUS_USER_DIR = f"{NUCLEUS_USER_ROOT_DIR}\NVIDIA"
+NVIDIA_NUCLEUS_USER_DIR = f"{NUCLEUS_USER_ROOT_DIR}/NVIDIA"
 
 ISAAC_NUCLEUS_DIR = f"{NUCLEUS_ASSET_ROOT_DIR}/Isaac"
 """Path to the ``Isaac`` directory on the NVIDIA Nucleus Server."""
