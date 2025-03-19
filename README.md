@@ -1,9 +1,7 @@
-<<<<<<< HEAD
-
 # Capstone-Design
 Multi-Agent Reinforcement Learning for Capstone Design Project
 
-=======
+===================================================
 
 
 ![Isaac Lab](docs/source/_static/isaaclab.jpg)
