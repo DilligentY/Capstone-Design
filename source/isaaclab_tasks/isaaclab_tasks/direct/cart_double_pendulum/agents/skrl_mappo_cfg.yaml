@@ -17,7 +17,7 @@ models:
         input: STATES
         layers: [32, 32]
         activations: elu
-    output: ACTIONS
+    output: ACTIONS 
   value:  # see deterministic_model parameters
     class: DeterministicMixin
     clip_actions: False
