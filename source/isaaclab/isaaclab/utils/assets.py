@@ -24,11 +24,17 @@ import omni.client
 NUCLEUS_ASSET_ROOT_DIR = carb.settings.get_settings().get("/persistent/isaac/asset_root/cloud")
 """Path to the root directory on the Nucleus Server."""
 
+NUCLEUS_USER_ROOT_DIR = "omniverse://localhost"
+
 NVIDIA_NUCLEUS_DIR = f"{NUCLEUS_ASSET_ROOT_DIR}/NVIDIA"
 """Path to the root directory on the NVIDIA Nucleus Server."""
 
+NVIDIA_NUCLEUS_USER_DIR = f"{NUCLEUS_USER_ROOT_DIR}\NVIDIA"
+
 ISAAC_NUCLEUS_DIR = f"{NUCLEUS_ASSET_ROOT_DIR}/Isaac"
 """Path to the ``Isaac`` directory on the NVIDIA Nucleus Server."""
+
+ISAAC_NUCLEUS_USER_DIR = f"{NUCLEUS_USER_ROOT_DIR}/Isaac"
 
 ISAACLAB_NUCLEUS_DIR = f"{ISAAC_NUCLEUS_DIR}/IsaacLab"
 """Path to the ``Isaac/IsaacLab`` directory on the NVIDIA Nucleus Server."""
