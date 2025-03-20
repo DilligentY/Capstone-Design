@@ -110,7 +110,7 @@ class TELLOEnv(DirectRLEnv):
         self._thrust = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self._torque = torch.zeros(self.num_envs, 1, 3, device=self.device)
         # Goal position
-        self._desired_pos_w_list = []
+        self._desired_pos_w_list = None
         self._desired_pos_w = torch.zeros(self.num_envs, 3, device=self.device)
 
         # Logging
@@ -225,6 +225,7 @@ class TELLOEnv(DirectRLEnv):
             # Spread out the resets to avoid spikes in training when many environments reset at a similar time
             self.episode_length_buf = torch.randint_like(self.episode_length_buf, high=int(self.max_episode_length))
 
+        self._desired_pos_w_list = None
         self._actions[env_ids] = 0.0
         # Sample new commands
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
@@ -258,28 +259,24 @@ class TELLOEnv(DirectRLEnv):
 
     def _debug_vis_callback(self, event):
         # update the markers
-        for i in range(len(self._desired_pos_w_list)):
-            self.goal_pos_visualizer.visualize(self._desired_pos_w_list[i])
+        if self._desired_pos_w_list is not None:
+            self.goal_pos_visualizer.visualize(self._desired_pos_w_list)
 
     def _set_desired_pos_list(self, env_ids):
         """Set Desired trajectory points with Width(x) and Height(y)"""
-        self._desired_pos_w_list.append(self._desired_pos_w[env_ids, :]) 
-
         width_mask = torch.zeros_like(self._desired_pos_w[env_ids, :])
         width_mask[:, 0] = 2.0
 
         height_mask = torch.zeros_like(self._desired_pos_w[env_ids, :])
         height_mask[:, 1] = 2.0
-
-        self._desired_pos_w_list.append(self._desired_pos_w)
         
-        p1 = self._desired_pos_w[env_ids, :] + width_mask
+        p0 = self._desired_pos_w[env_ids, :]
+        p1 = p0 + width_mask
         p2 = p1 + height_mask
         p3 = p2 - width_mask
 
-        self._desired_pos_w_list.append(p1)
-        self._desired_pos_w_list.append(p2)
-        self._desired_pos_w_list.append(p3)
+        self._desired_pos_w_list = torch.vstack([p0, p1, p2, p3])
+
 
 
             
