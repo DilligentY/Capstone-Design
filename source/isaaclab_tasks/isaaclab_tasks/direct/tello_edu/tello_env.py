@@ -91,7 +91,7 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     # robot configuration
     robot: ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     thrust_to_weight = 1.9
-    moment_scale = 0.01
+    torque_scale = 0.01
 
     # reward scales
     lin_vel_reward_scale = -0.05
@@ -108,8 +108,9 @@ class TELLOEnv(DirectRLEnv):
         # Total thrust and moment applied to the base of the quadcopter
         self._actions = torch.zeros(self.num_envs, gym.spaces.flatdim(self.single_action_space), device=self.device)
         self._thrust = torch.zeros(self.num_envs, 1, 3, device=self.device)
-        self._moment = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self._torque = torch.zeros(self.num_envs, 1, 3, device=self.device)
         # Goal position
+        self._desired_pos_w_list = []
         self._desired_pos_w = torch.zeros(self.num_envs, 3, device=self.device)
 
         # Logging
@@ -149,11 +150,11 @@ class TELLOEnv(DirectRLEnv):
         # Action을 어떻게 처리할 것인가?
         self._actions = actions.clone().clamp(-1.0, 1.0)
         self._thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self._actions[:, 0] + 1.0) / 2.0
-        self._moment[:, 0, :] = self.cfg.moment_scale * self._actions[:, 1:]
+        self._torque[:, 0, :] = self.cfg.torque_scale * self._actions[:, 1:]
 
     def _apply_action(self):
         # 정의된 Action을 실제 시뮬레이션에 적용
-        self._robot.set_external_force_and_torque(self._thrust, self._moment, body_ids=self._body_id)
+        self._robot.set_external_force_and_torque(self._thrust, self._torque, body_ids=self._body_id)
 
     def _get_observations(self) -> dict:
         # Observation Space 세팅
@@ -229,6 +230,8 @@ class TELLOEnv(DirectRLEnv):
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
         self._desired_pos_w[env_ids, 2] = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.5)
+        self._set_desired_pos_list(env_ids)
+
         # Reset robot state
         joint_pos = self._robot.data.default_joint_pos[env_ids]
         joint_vel = self._robot.data.default_joint_vel[env_ids]
@@ -255,4 +258,29 @@ class TELLOEnv(DirectRLEnv):
 
     def _debug_vis_callback(self, event):
         # update the markers
-        self.goal_pos_visualizer.visualize(self._desired_pos_w)
+        for i in range(len(self._desired_pos_w_list)):
+            self.goal_pos_visualizer.visualize(self._desired_pos_w_list[i])
+
+    def _set_desired_pos_list(self, env_ids):
+        """Set Desired trajectory points with Width(x) and Height(y)"""
+        self._desired_pos_w_list.append(self._desired_pos_w[env_ids, :]) 
+
+        width_mask = torch.zeros_like(self._desired_pos_w[env_ids, :])
+        width_mask[:, 0] = 2.0
+
+        height_mask = torch.zeros_like(self._desired_pos_w[env_ids, :])
+        height_mask[:, 1] = 2.0
+
+        self._desired_pos_w_list.append(self._desired_pos_w)
+        
+        p1 = self._desired_pos_w[env_ids, :] + width_mask
+        p2 = p1 + height_mask
+        p3 = p2 - width_mask
+
+        self._desired_pos_w_list.append(p1)
+        self._desired_pos_w_list.append(p2)
+        self._desired_pos_w_list.append(p3)
+
+
+            
+            
