@@ -50,7 +50,7 @@ class TELLOEnvWindow(BaseEnvWindow):
 @configclass
 class TELLOEnvCfg(DirectRLEnvCfg):
     # env information
-    episode_length_s = 10.0
+    episode_length_s = 30.0
     decimation = 2
     action_space = 4
     observation_space = 12
@@ -93,7 +93,8 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     thrust_to_weight = 1.9
     torque_scale = 0.01
 
-    # reward scales
+    # reward scales & Change Logic
+    distance_threshold = 0.1
     lin_vel_reward_scale = -0.05
     ang_vel_reward_scale = -0.01
     distance_to_goal_reward_scale = 15.0
@@ -188,6 +189,9 @@ class TELLOEnv(DirectRLEnv):
         # Logging
         for key, value in rewards.items():
             self._episode_sums[key] += value
+
+        self._set_next_target_point(distance_to_goal)
+        
         return reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
@@ -225,8 +229,9 @@ class TELLOEnv(DirectRLEnv):
             # Spread out the resets to avoid spikes in training when many environments reset at a similar time
             self.episode_length_buf = torch.randint_like(self.episode_length_buf, high=int(self.max_episode_length))
 
+        self._actions[env_ids]   = 0.0
         self._desired_pos_w_list = None
-        self._actions[env_ids] = 0.0
+        self.wp_idx = torch.zeros(self.num_envs, 1, device=self.device)
         # Sample new commands
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
@@ -278,6 +283,13 @@ class TELLOEnv(DirectRLEnv):
         self._desired_pos_w_list = torch.vstack([p0, p1, p2, p3])
 
 
+    def _set_next_target_point(self, distance_to_goal : torch.Tensor):
 
-            
-            
+        is_next = torch.where(distance_to_goal < self.cfg.distance_threshold)[0]
+        if len(is_next) > 0:
+            wp_mask = torch.zeros(self.num_envs, 1, device=self.device)
+            wp_mask[is_next] = 1
+            self.wp_idx += wp_mask
+
+            row_indices = self.wp_idx[is_next].squeeze(-1).long() * self.num_envs + is_next
+            self._desired_pos_w[is_next] = self._desired_pos_w_list[row_indices]
