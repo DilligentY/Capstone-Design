@@ -86,7 +86,7 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     )
 
     # scene configuration
-    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=2.5, replicate_physics=True)
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=5.0, replicate_physics=True)
 
     # robot configuration
     robot: ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
@@ -94,7 +94,7 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     torque_scale = 0.01
 
     # reward scales & Change Logic
-    distance_threshold = 0.1
+    distance_threshold = 0.3
     lin_vel_reward_scale = -0.05
     ang_vel_reward_scale = -0.01
     distance_to_goal_reward_scale = 15.0
@@ -104,7 +104,7 @@ class TELLOEnv(DirectRLEnv):
     cfg: TELLOEnvCfg
 
     def __init__(self, cfg: TELLOEnvCfg, render_mode: str | None = None, **kwargs):
-        super().__init__(cfg, render_mode, **kwargs)
+        super().__init__(cfg, render_smode, **kwargs)
 
         # Total thrust and moment applied to the base of the quadcopter
         self._actions = torch.zeros(self.num_envs, gym.spaces.flatdim(self.single_action_space), device=self.device)
@@ -159,6 +159,14 @@ class TELLOEnv(DirectRLEnv):
 
     def _get_observations(self) -> dict:
         # Observation Space 세팅
+        """
+        Args
+            lin_vel_b : linear velocity vector based on body frame
+            ang_vel_b : angular velocity vector based on body frame 
+            projected_gravity_b : gravity vector based on body frame axis
+            desired_pos_b : position of desired point based on body frame
+
+        """
         desired_pos_b, _ = subtract_frame_transforms(
             self._robot.data.root_state_w[:, :3], self._robot.data.root_state_w[:, 3:7], self._desired_pos_w
         )
@@ -176,6 +184,13 @@ class TELLOEnv(DirectRLEnv):
 
     def _get_rewards(self) -> torch.Tensor:
         # Reward 세팅
+        """
+        Args
+            lin_vel : Blocking Agressive Linear Motion
+            ang_vel : Blocking Agressive Rotation Motion
+            distance_to_goal : Guide to approach goal point 
+
+        """
         lin_vel = torch.sum(torch.square(self._robot.data.root_lin_vel_b), dim=1)
         ang_vel = torch.sum(torch.square(self._robot.data.root_ang_vel_b), dim=1)
         distance_to_goal = torch.linalg.norm(self._desired_pos_w - self._robot.data.root_pos_w, dim=1)
@@ -230,8 +245,6 @@ class TELLOEnv(DirectRLEnv):
             self.episode_length_buf = torch.randint_like(self.episode_length_buf, high=int(self.max_episode_length))
 
         self._actions[env_ids]   = 0.0
-        self._desired_pos_w_list = None
-        self.wp_idx = torch.zeros(self.num_envs, 1, device=self.device)
         # Sample new commands
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
@@ -265,7 +278,7 @@ class TELLOEnv(DirectRLEnv):
     def _debug_vis_callback(self, event):
         # update the markers
         if self._desired_pos_w_list is not None:
-            self.goal_pos_visualizer.visualize(self._desired_pos_w_list)
+            self.goal_pos_visualizer.visualize(self._desired_pos_w_list.transpose(1, 2).reshape(-1, 3))
 
     def _set_desired_pos_list(self, env_ids):
         """Set Desired trajectory points with Width(x) and Height(y)"""
@@ -280,16 +293,19 @@ class TELLOEnv(DirectRLEnv):
         p2 = p1 + height_mask
         p3 = p2 - width_mask
 
-        self._desired_pos_w_list = torch.vstack([p0, p1, p2, p3])
+        desired_pos_w_list = torch.dstack([p0, p1, p2, p3])
 
+        if len(env_ids) == self.num_envs:
+            self._desired_pos_w_list = desired_pos_w_list
+            self.point_ids = torch.zeros(self.num_envs, 1, device=self.device)
+        else:
+            self._desired_pos_w_list[env_ids, :, :] = desired_pos_w_list
+            self.point_ids[env_ids] = 0
 
     def _set_next_target_point(self, distance_to_goal : torch.Tensor):
+        next_env_ids = torch.where(distance_to_goal < self.cfg.distance_threshold)[0].to(device=self.device)
+        if len(next_env_ids) > 0:
+            self.point_ids[next_env_ids] += 1
+            self.point_ids[next_env_ids] %= 4
 
-        is_next = torch.where(distance_to_goal < self.cfg.distance_threshold)[0]
-        if len(is_next) > 0:
-            wp_mask = torch.zeros(self.num_envs, 1, device=self.device)
-            wp_mask[is_next] = 1
-            self.wp_idx += wp_mask
-
-            row_indices = self.wp_idx[is_next].squeeze(-1).long() * self.num_envs + is_next
-            self._desired_pos_w[is_next] = self._desired_pos_w_list[row_indices]
+            self._desired_pos_w[next_env_ids, :] = self._desired_pos_w_list[next_env_ids, :, self.point_ids[next_env_ids].squeeze(-1).long()]
