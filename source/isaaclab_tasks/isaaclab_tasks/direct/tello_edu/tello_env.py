@@ -205,7 +205,7 @@ class TELLOEnv(DirectRLEnv):
         for key, value in rewards.items():
             self._episode_sums[key] += value
 
-        self._set_next_target_point(distance_to_goal)
+        # self._set_next_target_point(distance_to_goal)
         
         return reward
 
@@ -249,7 +249,7 @@ class TELLOEnv(DirectRLEnv):
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
         self._desired_pos_w[env_ids, 2] = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.5)
-        self._set_desired_pos_list(env_ids)
+        # self._set_desired_pos_list(env_ids)
 
         # Reset robot state
         joint_pos = self._robot.data.default_joint_pos[env_ids]
@@ -261,7 +261,7 @@ class TELLOEnv(DirectRLEnv):
         self._robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 
     def _set_debug_vis_impl(self, debug_vis: bool):
-        # create markers if necessary for the first tome
+        # create markers if necessary for the first time
         if debug_vis:
             if not hasattr(self, "goal_pos_visualizer"):
                 marker_cfg = CUBOID_MARKER_CFG.copy()
@@ -279,33 +279,53 @@ class TELLOEnv(DirectRLEnv):
         # update the markers
         if self._desired_pos_w_list is not None:
             self.goal_pos_visualizer.visualize(self._desired_pos_w_list.transpose(1, 2).reshape(-1, 3))
+        else:
+            self.goal_pos_visualizer.visualize(self._desired_pos_w)
 
-    def _set_desired_pos_list(self, env_ids):
+    def _set_desired_pos_square(self, env_ids):
         """Set Desired trajectory points with Width(x) and Height(y)"""
-        width_mask = torch.zeros_like(self._desired_pos_w[env_ids, :])
-        width_mask[:, 0] = 2.0
-
-        height_mask = torch.zeros_like(self._desired_pos_w[env_ids, :])
-        height_mask[:, 1] = 2.0
+        offset = self._desired_pos_w[env_ids, :].unsqueeze(0).permute(0, 2, 1)
+        square_mask = torch.stack([
+            torch.tensor([1, 2]),
+            torch.tensor([1, 2]),
+            torch.tensor([0, 0])
+        ], dim=1)
         
-        p0 = self._desired_pos_w[env_ids, :]
-        p1 = p0 + width_mask
-        p2 = p1 + height_mask
-        p3 = p2 - width_mask
-
-        desired_pos_w_list = torch.dstack([p0, p1, p2, p3])
-
+        square_mask = square_mask.unsqueeze(0).repeat(1, 1, len(env_ids))
+        
         if len(env_ids) == self.num_envs:
-            self._desired_pos_w_list = desired_pos_w_list
             self.point_ids = torch.zeros(self.num_envs, 1, device=self.device)
         else:
-            self._desired_pos_w_list[env_ids, :, :] = desired_pos_w_list
             self.point_ids[env_ids] = 0
-
+            
+        self._desired_pos_w_list = square_mask + offset
+            
+            
+    def _set_desired_pos_helix(self, env_ids, num_points):
+        offset = self._desired_pos_w[env_ids, :].unsqueeze(0).permute(0, 2, 1)
+        angle_step = torch.linspace(0, torch.pi, num_points, device=self.device)
+        height_step = torch.linspace(0, 3, num_points, device=self.device)
+        
+        helix_mask = torch.stack([
+            2*torch.cos(angle_step),
+            2*torch.sin(angle_step),
+            height_step
+        ], dim=1)
+        
+        helix_mask = helix_mask.unsqueeze(-1).repeat(1, 1, len(env_ids))
+        
+        if len(env_ids) == self.num_envs:
+            self.point_ids = torch.zeros(self.num_envs, 1, device=self.device)
+        else:
+            self.point_ids[env_ids] = 0
+            
+        self._desired_pos_w_list = helix_mask + offset
+        
+        
     def _set_next_target_point(self, distance_to_goal : torch.Tensor):
+        num_points = self._desired_pos_w_list.shape()[0]
         next_env_ids = torch.where(distance_to_goal < self.cfg.distance_threshold)[0].to(device=self.device)
         if len(next_env_ids) > 0:
             self.point_ids[next_env_ids] += 1
-            self.point_ids[next_env_ids] %= 4
-
-            self._desired_pos_w[next_env_ids, :] = self._desired_pos_w_list[next_env_ids, :, self.point_ids[next_env_ids].squeeze(-1).long()]
+            self.point_ids[next_env_ids] %= num_points
+            self._desired_pos_w[next_env_ids, :] = self._desired_pos_w_list[self.point_ids[next_env_ids].squeeze(-1).long(), :, next_env_ids]
