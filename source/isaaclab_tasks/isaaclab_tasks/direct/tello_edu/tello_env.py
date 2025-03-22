@@ -104,7 +104,7 @@ class TELLOEnv(DirectRLEnv):
     cfg: TELLOEnvCfg
 
     def __init__(self, cfg: TELLOEnvCfg, render_mode: str | None = None, **kwargs):
-        super().__init__(cfg, render_smode, **kwargs)
+        super().__init__(cfg, render_mode, **kwargs)
 
         # Total thrust and moment applied to the base of the quadcopter
         self._actions = torch.zeros(self.num_envs, gym.spaces.flatdim(self.single_action_space), device=self.device)
@@ -205,7 +205,7 @@ class TELLOEnv(DirectRLEnv):
         for key, value in rewards.items():
             self._episode_sums[key] += value
 
-        self._set_next_target_point(distance_to_goal)
+        # self._set_next_target_point(distance_to_goal)
         
         return reward
 
@@ -249,7 +249,7 @@ class TELLOEnv(DirectRLEnv):
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
         self._desired_pos_w[env_ids, 2] = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.5)
-        self._set_desired_pos_list(env_ids)
+        # self._set_desired_pos_list(env_ids)
 
         # Reset robot state
         joint_pos = self._robot.data.default_joint_pos[env_ids]
@@ -279,6 +279,12 @@ class TELLOEnv(DirectRLEnv):
         # update the markers
         if self._desired_pos_w_list is not None:
             self.goal_pos_visualizer.visualize(self._desired_pos_w_list.transpose(1, 2).reshape(-1, 3))
+        else:
+            self.goal_pos_visualizer.visualize(self._desired_pos_w)
+
+
+    ################# Customized Function #####################
+
 
     def _set_desired_pos_list(self, env_ids):
         """Set Desired trajectory points with Width(x) and Height(y)"""
