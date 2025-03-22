@@ -104,7 +104,7 @@ class TELLOEnv(DirectRLEnv):
     cfg: TELLOEnvCfg
 
     def __init__(self, cfg: TELLOEnvCfg, render_mode: str | None = None, **kwargs):
-        super().__init__(cfg, render_smode, **kwargs)
+        super().__init__(cfg, render_mode, **kwargs)
 
         # Total thrust and moment applied to the base of the quadcopter
         self._actions = torch.zeros(self.num_envs, gym.spaces.flatdim(self.single_action_space), device=self.device)
