@@ -50,7 +50,7 @@ class TELLOEnvWindow(BaseEnvWindow):
 @configclass
 class TELLOEnvCfg(DirectRLEnvCfg):
     # env information
-    episode_length_s = 30.0
+    episode_length_s = 50.0
     decimation = 2
     action_space = 4
     observation_space = 12
@@ -86,17 +86,19 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     )
 
     # scene configuration
-    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=5.0, replicate_physics=True)
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=2.0, replicate_physics=True)
 
     # robot configuration
     robot: ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
-    thrust_to_weight = 1.9
+    thrust_to_weight = 1.5
     torque_scale = 0.01
 
     # reward scales & Change Logic
-    distance_threshold = 0.3
-    lin_vel_reward_scale = -0.05
-    ang_vel_reward_scale = -0.01
+    distance_threshold = 0.5
+    # lin_vel_reward_scale = -0.05
+    # ang_vel_reward_scale = -0.01
+    lin_vel_reward_scale = 0.0
+    ang_vel_reward_scale = 0.0
     distance_to_goal_reward_scale = 15.0
 
 
@@ -205,7 +207,7 @@ class TELLOEnv(DirectRLEnv):
         for key, value in rewards.items():
             self._episode_sums[key] += value
 
-        # self._set_next_target_point(distance_to_goal)
+        self._set_next_target_point(distance_to_goal)
         
         return reward
 
@@ -249,7 +251,7 @@ class TELLOEnv(DirectRLEnv):
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
         self._desired_pos_w[env_ids, 2] = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.5)
-        # self._set_desired_pos_list(env_ids)
+        self._set_desired_pos_circle(env_ids)
 
         # Reset robot state
         joint_pos = self._robot.data.default_joint_pos[env_ids]
@@ -282,29 +284,33 @@ class TELLOEnv(DirectRLEnv):
         else:
             self.goal_pos_visualizer.visualize(self._desired_pos_w)
 
+
+    #################### Customized Function ########################
+
     def _set_desired_pos_square(self, env_ids):
         """Set Desired trajectory points with Width(x) and Height(y)"""
         offset = self._desired_pos_w[env_ids, :].unsqueeze(0).permute(0, 2, 1)
         square_mask = torch.stack([
-            torch.tensor([1, 2]),
-            torch.tensor([1, 2]),
-            torch.tensor([0, 0])
+            torch.tensor([1, 2], device=self.device),
+            torch.tensor([1, 2], device=self.device),
+            torch.tensor([0, 0], device=self.device)
         ], dim=1)
         
-        square_mask = square_mask.unsqueeze(0).repeat(1, 1, len(env_ids))
+        square_mask = square_mask.unsqueeze(-1).repeat(1, 1, len(env_ids))
+        square_w = square_mask + offset
         
         if len(env_ids) == self.num_envs:
+            self._desired_pos_w_list = square_w
             self.point_ids = torch.zeros(self.num_envs, 1, device=self.device)
         else:
+            self._desired_pos_w_list[:, :, env_ids] = square_w
             self.point_ids[env_ids] = 0
-            
-        self._desired_pos_w_list = square_mask + offset
-            
-            
-    def _set_desired_pos_helix(self, env_ids, num_points):
+        
+
+    def _set_desired_pos_circle(self, env_ids, num_points=10):
         offset = self._desired_pos_w[env_ids, :].unsqueeze(0).permute(0, 2, 1)
-        angle_step = torch.linspace(0, torch.pi, num_points, device=self.device)
-        height_step = torch.linspace(0, 3, num_points, device=self.device)
+        angle_step = torch.linspace(0, 2*torch.pi, num_points, device=self.device)
+        height_step = torch.zeros(num_points, device=self.device)
         
         helix_mask = torch.stack([
             2*torch.cos(angle_step),
@@ -313,17 +319,40 @@ class TELLOEnv(DirectRLEnv):
         ], dim=1)
         
         helix_mask = helix_mask.unsqueeze(-1).repeat(1, 1, len(env_ids))
+        helix_w = helix_mask + offset
         
         if len(env_ids) == self.num_envs:
+            self._desired_pos_w_list = helix_w
             self.point_ids = torch.zeros(self.num_envs, 1, device=self.device)
         else:
+            self._desired_pos_w_list[:, :, env_ids] = helix_w
             self.point_ids[env_ids] = 0
-            
-        self._desired_pos_w_list = helix_mask + offset
+
+
+    def _set_desired_pos_helix(self, env_ids, num_points=10):
+        offset = self._desired_pos_w[env_ids, :].unsqueeze(0).permute(0, 2, 1)
+        angle_step = torch.linspace(0, 2*torch.pi, num_points, device=self.device)
+        height_step = torch.linspace(0, 5, num_points, device=self.device)
+        
+        helix_mask = torch.stack([
+            torch.cos(angle_step),
+            torch.sin(angle_step),
+            height_step
+        ], dim=1)
+        
+        helix_mask = helix_mask.unsqueeze(-1).repeat(1, 1, len(env_ids))
+        helix_w = helix_mask + offset
+        
+        if len(env_ids) == self.num_envs:
+            self._desired_pos_w_list = helix_w
+            self.point_ids = torch.zeros(self.num_envs, 1, device=self.device)
+        else:
+            self._desired_pos_w_list[:, :, env_ids] = helix_w
+            self.point_ids[env_ids] = 0
         
         
     def _set_next_target_point(self, distance_to_goal : torch.Tensor):
-        num_points = self._desired_pos_w_list.shape()[0]
+        num_points = self._desired_pos_w_list.shape[0]
         next_env_ids = torch.where(distance_to_goal < self.cfg.distance_threshold)[0].to(device=self.device)
         if len(next_env_ids) > 0:
             self.point_ids[next_env_ids] += 1
