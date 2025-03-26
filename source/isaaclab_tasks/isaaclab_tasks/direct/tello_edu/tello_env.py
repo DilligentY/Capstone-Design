@@ -50,7 +50,7 @@ class TELLOEnvWindow(BaseEnvWindow):
 @configclass
 class TELLOEnvCfg(DirectRLEnvCfg):
     # env information
-    episode_length_s = 50.0
+    episode_length_s = 20.0
     decimation = 2
     action_space = 4
     observation_space = 12
@@ -86,20 +86,19 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     )
 
     # scene configuration
-    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=2.0, replicate_physics=True)
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=5.0, replicate_physics=True)
 
     # robot configuration
     robot: ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
-    thrust_to_weight = 1.5
-    torque_scale = 0.01
+    thrust_to_weight = 1.9
+    torque_scale = 0.1
 
     # reward scales & Change Logic
     distance_threshold = 0.5
-    # lin_vel_reward_scale = -0.05
-    # ang_vel_reward_scale = -0.01
-    lin_vel_reward_scale = 0.0
-    ang_vel_reward_scale = 0.0
-    distance_to_goal_reward_scale = 15.0
+    lin_vel_reward_scale = -0.05
+    ang_vel_reward_scale = -0.01
+    distance_to_goal_reward_scale = 20.0
+    approach_bonus_scale = 2.0
 
 
 class TELLOEnv(DirectRLEnv):
@@ -190,31 +189,37 @@ class TELLOEnv(DirectRLEnv):
         Args
             lin_vel : Blocking Agressive Linear Motion
             ang_vel : Blocking Agressive Rotation Motion
-            distance_to_goal : Guide to approach goal point 
+            distance_to_goal : Guide to approach goal point
 
         """
         lin_vel = torch.sum(torch.square(self._robot.data.root_lin_vel_b), dim=1)
         ang_vel = torch.sum(torch.square(self._robot.data.root_ang_vel_b), dim=1)
         distance_to_goal = torch.linalg.norm(self._desired_pos_w - self._robot.data.root_pos_w, dim=1)
-        distance_to_goal_mapped = 1 - torch.tanh(distance_to_goal / 0.8)
+        distance_to_goal_mapped = 1 - torch.tanh(distance_to_goal)
         rewards = {
             "lin_vel": lin_vel * self.cfg.lin_vel_reward_scale * self.step_dt,
             "ang_vel": ang_vel * self.cfg.ang_vel_reward_scale * self.step_dt,
             "distance_to_goal": distance_to_goal_mapped * self.cfg.distance_to_goal_reward_scale * self.step_dt,
         }
         reward = torch.sum(torch.stack(list(rewards.values())), dim=0)
+
         # Logging
         for key, value in rewards.items():
             self._episode_sums[key] += value
+            # print(f"reward : {reward.item()}")
 
-        self._set_next_target_point(distance_to_goal)
-        
+        # self._set_next_target_point(distance_to_goal)
+    
         return reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         # 에피소드 종료조건 체크
         time_out = self.episode_length_buf >= self.max_episode_length - 1
         died = torch.logical_or(self._robot.data.root_pos_w[:, 2] < 0.1, self._robot.data.root_pos_w[:, 2] > 2.0)
+
+        # if died:
+        #     print("Truncation")
+
         return died, time_out
 
     def _reset_idx(self, env_ids: torch.Tensor | None):
@@ -251,7 +256,7 @@ class TELLOEnv(DirectRLEnv):
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
         self._desired_pos_w[env_ids, 2] = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.5)
-        self._set_desired_pos_circle(env_ids)
+        # self._set_desired_pos_helix(env_ids)
 
         # Reset robot state
         joint_pos = self._robot.data.default_joint_pos[env_ids]
@@ -335,8 +340,8 @@ class TELLOEnv(DirectRLEnv):
         height_step = torch.linspace(0, 5, num_points, device=self.device)
         
         helix_mask = torch.stack([
-            torch.cos(angle_step),
-            torch.sin(angle_step),
+            2*torch.cos(angle_step),
+            2*torch.sin(angle_step),
             height_step
         ], dim=1)
         
