@@ -14,6 +14,7 @@ a more user-friendly way.
 
 import argparse
 import sys
+import numpy as np
 
 from isaaclab.app import AppLauncher
 
