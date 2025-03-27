@@ -8,16 +8,20 @@ from __future__ import annotations
 import gymnasium as gym
 import torch
 
+import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, ArticulationCfg
 from isaaclab.envs import DirectRLEnv, DirectRLEnvCfg
 from isaaclab.envs.ui import BaseEnvWindow
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.sim import SimulationCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.math import subtract_frame_transforms
+from isaaclab.utils.noise import NoiseModelWithAdditiveBiasCfg, GaussianNoiseCfg
 
 ##
 # Pre-defined configs
@@ -25,6 +29,31 @@ from isaaclab.utils.math import subtract_frame_transforms
 from isaaclab_assets import CRAZYFLIE_CFG  # isort: skip
 from isaaclab_assets import TELLOAPPROX_CFG
 from isaaclab.markers import CUBOID_MARKER_CFG  # isort: skip
+
+@configclass
+class EventCfg:
+    """Configuration for randomization."""
+    physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            "static_friction_range": (0.8, 0.8),
+            "dynamic_friction_range": (0.6, 0.6),
+            "restitution_range": (0.0, 0.0),
+            "num_buckets": 64,
+        },
+    )
+
+    add_base_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="base"),
+            "mass_distribution_params": (-0.005, 0.005),
+            "operation": "add",
+        },
+    )
 
 
 class TELLOEnvWindow(BaseEnvWindow):
@@ -50,7 +79,7 @@ class TELLOEnvWindow(BaseEnvWindow):
 @configclass
 class TELLOEnvCfg(DirectRLEnvCfg):
     # env information
-    episode_length_s = 20.0
+    episode_length_s = 10.0
     decimation = 2
     action_space = 4
     observation_space = 12
@@ -86,19 +115,29 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     )
 
     # scene configuration
-    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=5.0, replicate_physics=True)
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=2.0, replicate_physics=True)
 
     # robot configuration
     robot: ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
-    thrust_to_weight = 1.9
+    thrust_to_weight = 1.7
     torque_scale = 0.1
 
     # reward scales & Change Logic
-    distance_threshold = 0.5
-    lin_vel_reward_scale = -0.05
+    distance_threshold = 0.3
+    lin_vel_reward_scale = -0.5
     ang_vel_reward_scale = -0.01
     distance_to_goal_reward_scale = 20.0
-    approach_bonus_scale = 2.0
+
+    # Noise Model for Domain Randomization
+    # action_noise_model: NoiseModelWithAdditiveBiasCfg = NoiseModelWithAdditiveBiasCfg(
+    #   noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.05, operation="add"),
+    #   bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.01, operation="abs"),
+    # )
+
+    # observation_noise_model: NoiseModelWithAdditiveBiasCfg = NoiseModelWithAdditiveBiasCfg(
+    #   noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.001, operation="add"),
+    #   bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.0001, operation="abs"),
+    # )
 
 
 class TELLOEnv(DirectRLEnv):
@@ -134,8 +173,6 @@ class TELLOEnv(DirectRLEnv):
         self.set_debug_vis(self.cfg.debug_vis)
 
     def _setup_scene(self):
-        # 하나의 환경을 구성하는 객체들 모두 스폰
-        # 병렬 환경 복제 등..
         self._robot = Articulation(self.cfg.robot)
         self.scene.articulations["robot"] = self._robot
 
@@ -149,17 +186,14 @@ class TELLOEnv(DirectRLEnv):
         light_cfg.func("/World/Light", light_cfg)
 
     def _pre_physics_step(self, actions: torch.Tensor):
-        # Action을 어떻게 처리할 것인가?
         self._actions = actions.clone().clamp(-1.0, 1.0)
         self._thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self._actions[:, 0] + 1.0) / 2.0
         self._torque[:, 0, :] = self.cfg.torque_scale * self._actions[:, 1:]
 
     def _apply_action(self):
-        # 정의된 Action을 실제 시뮬레이션에 적용
         self._robot.set_external_force_and_torque(self._thrust, self._torque, body_ids=self._body_id)
 
     def _get_observations(self) -> dict:
-        # Observation Space 세팅
         """
         Args
             lin_vel_b : linear velocity vector based on body frame
@@ -184,7 +218,6 @@ class TELLOEnv(DirectRLEnv):
         return observations
 
     def _get_rewards(self) -> torch.Tensor:
-        # Reward 세팅
         """
         Args
             lin_vel : Blocking Agressive Linear Motion
@@ -199,7 +232,7 @@ class TELLOEnv(DirectRLEnv):
         rewards = {
             "lin_vel": lin_vel * self.cfg.lin_vel_reward_scale * self.step_dt,
             "ang_vel": ang_vel * self.cfg.ang_vel_reward_scale * self.step_dt,
-            "distance_to_goal": distance_to_goal_mapped * self.cfg.distance_to_goal_reward_scale * self.step_dt,
+            "distance_to_goal": distance_to_goal_mapped * self.cfg.distance_to_goal_reward_scale * self.step_dt
         }
         reward = torch.sum(torch.stack(list(rewards.values())), dim=0)
 
@@ -213,7 +246,6 @@ class TELLOEnv(DirectRLEnv):
         return reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
-        # 에피소드 종료조건 체크
         time_out = self.episode_length_buf >= self.max_episode_length - 1
         died = torch.logical_or(self._robot.data.root_pos_w[:, 2] < 0.1, self._robot.data.root_pos_w[:, 2] > 2.0)
 
@@ -223,7 +255,6 @@ class TELLOEnv(DirectRLEnv):
         return died, time_out
 
     def _reset_idx(self, env_ids: torch.Tensor | None):
-        # 에피소드 초기화
         if env_ids is None or len(env_ids) == self.num_envs:
             env_ids = self._robot._ALL_INDICES
 
@@ -251,12 +282,12 @@ class TELLOEnv(DirectRLEnv):
             # Spread out the resets to avoid spikes in training when many environments reset at a similar time
             self.episode_length_buf = torch.randint_like(self.episode_length_buf, high=int(self.max_episode_length))
 
-        self._actions[env_ids]   = 0.0
+        self._actions[env_ids] = 0.0
         # Sample new commands
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
-        self._desired_pos_w[env_ids, 2] = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.5)
-        # self._set_desired_pos_helix(env_ids)
+        self._desired_pos_w[env_ids, 2]  = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.0)
+        # self._set_desired_pos_circle(env_ids)
 
         # Reset robot state
         joint_pos = self._robot.data.default_joint_pos[env_ids]
