@@ -41,7 +41,7 @@ memory:
 # learning_rate_scheduler: KLAdaptiveLR
 agent:
   class: PPO
-  rollouts: 24
+  rollouts: 48
   learning_epochs: 5
   mini_batches: 4
   discount_factor: 0.99
@@ -75,6 +75,7 @@ agent:
 
 # Sequential trainer
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html
+# timesteps = Total Time Step
 trainer:
   class: SequentialTrainer
   timesteps: 4800

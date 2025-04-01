@@ -82,7 +82,7 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     episode_length_s = 10.0
     decimation = 2
     action_space = 4
-    observation_space = 12
+    observation_space = 14
     state_space = 0
     debug_vis = True
 
@@ -115,7 +115,7 @@ class TELLOEnvCfg(DirectRLEnvCfg):
     )
 
     # scene configuration
-    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=5.0, replicate_physics=True)
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=2.5, replicate_physics=True)
 
     # robot configuration
     robot: ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
@@ -202,19 +202,33 @@ class TELLOEnv(DirectRLEnv):
             desired_pos_b : position of desired point based on body frame
 
         """
+        altitude_robot = self._robot.data.root_state_w[:, 2]
         desired_pos_b, _ = subtract_frame_transforms(
             self._robot.data.root_state_w[:, :3], self._robot.data.root_state_w[:, 3:7], self._desired_pos_w
         )
+        # obs = torch.cat(
+        #     [
+        #         self._robot.data.root_lin_vel_b,
+        #         self._robot.data.root_ang_vel_b,
+        #         self._robot.data.projected_gravity_b,
+        #         desired_pos_b,
+        #     ],
+        #     dim=-1,
+        # )
+
         obs = torch.cat(
             [
                 self._robot.data.root_lin_vel_b,
                 self._robot.data.root_ang_vel_b,
-                self._robot.data.projected_gravity_b,
+                self._robot.data.root_quat_w,
                 desired_pos_b,
+                altitude_robot.unsqueeze(-1),
             ],
-            dim=-1,
+            dim=-1
         )
+
         observations = {"policy": obs}
+
         return observations
 
     def _get_rewards(self) -> torch.Tensor:

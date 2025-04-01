@@ -17,6 +17,7 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim import PhysxCfg, SimulationCfg
+from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.sim.spawners.materials.physics_materials_cfg import RigidBodyMaterialCfg
 from isaaclab.utils.noise import NoiseModelWithAdditiveBiasCfg, GaussianNoiseCfg
 from isaaclab.utils import configclass
@@ -120,10 +121,10 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     # env
     decimation = 2
     episode_length_s = 10.0
-    possible_agents = ["leader", "first_left", "second_left", "first_right", "second_right"]
-    action_spaces = {"leader" : 4, "first_left" : 4, "second_left" : 4, "first_right" : 4, "second_right" : 4}
-    observation_spaces = {"leader" : 15, "first_left" : 15, "second_left" : 15, "first_right" : 15, "second_right" : 15}
-    state_space = 100
+    possible_agents = ["leader", "left", "right"]
+    action_spaces = {"leader" : 4, "left" : 4, "right" : 4}
+    observation_spaces = {"leader" : 18, "left" : 15, "right" : 15}
+    state_space = 108
 
     # simulation
     sim: SimulationCfg = SimulationCfg(
@@ -137,14 +138,26 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
             restitution=0.0,
         ),
     )
+    terrain = TerrainImporterCfg(
+        prim_path="/World/ground",
+        terrain_type="plane",
+        collision_group=-1,
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="multiply",
+            static_friction=1.0,
+            dynamic_friction=1.0,
+            restitution=0.0,
+        ),
+        debug_vis=False,
+    )
+
     # robot
     leader_robot_cfg        : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     
-    first_left_robot_cfg    : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
-    second_left_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
+    left_robot_cfg    : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     
-    first_right_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
-    second_right_robot_cfg  : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
+    right_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Robot")
     
 
     # # in-hand object : 추후 Payload Task에서 추가할 것
