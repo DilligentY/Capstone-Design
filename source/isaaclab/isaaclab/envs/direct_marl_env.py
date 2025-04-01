@@ -387,7 +387,7 @@ class DirectMARLEnv(gym.Env):
         self.terminated_dict, self.time_out_dict = self._get_dones()
         self.reset_buf[:] = math.prod(self.terminated_dict.values()) | math.prod(self.time_out_dict.values())
         self.reward_dict = self._get_rewards()
-
+        
         # -- reset envs that terminated/timed-out and log the episode information
         reset_env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(reset_env_ids) > 0:
