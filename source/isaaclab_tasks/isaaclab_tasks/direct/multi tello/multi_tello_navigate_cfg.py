@@ -123,8 +123,8 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     episode_length_s = 10.0
     possible_agents = ["leader", "left", "right"]
     action_spaces = {"leader" : 4, "left" : 4, "right" : 4}
-    observation_spaces = {"leader" : 18, "left" : 15, "right" : 15}
-    state_space = 108
+    observation_spaces = {"leader" : 18, "left" : 18, "right" : 18}
+    state_space = 54
 
     # simulation
     sim: SimulationCfg = SimulationCfg(

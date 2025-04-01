@@ -146,7 +146,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     # Altitude (1)
                     self.left_altitude,
                     # Actions (4)
-                    self.actions["left"]
+                    self.actions["left"],
+                    # Position Error (3)
+                    self.desired_pos_b
                 ),
                 dim=-1
             ),
@@ -163,7 +165,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     # Altitude (1)
                     self.right_altitude,
                     # Actions (4)
-                    self.actions["right"]
+                    self.actions["right"],
+                    # Position Error (3)
+                    self.desired_pos_b
                 ),
                 dim=-1
             ),
@@ -175,21 +179,21 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
     def _get_states(self) -> torch.Tensor:
         states = torch.cat(
             (
-                # ---- Leader Agent ----
+                # ---- Leader Agent (18) ----
                 self.leader_lin_vel_b,
                 self.leader_ang_vel_b,
                 self.leader_rot,
                 self.leader_altitude,
                 self.actions["leader"],
                 self.desired_pos_b,
-                # ---- Left Agent ----
+                # ---- Left Agent (18) ----
                 self.left_lin_vel_b,
                 self.left_ang_vel_b,
                 self.left_rot,
                 self.left_altitude,
                 self.actions["left"],
                 self.pos_left_leader_b,
-                # ---- Right Agent ----
+                # ---- Right Agent (18) ----
                 self.right_lin_vel_b,
                 self.right_ang_vel_b,
                 self.right_rot,
