@@ -233,10 +233,13 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     thrust_to_weight = 1.7
     torque_scale = 0.1
     # reward-related scales
-    distance_threshold = 0.3
     lin_vel_reward_scale = -0.5
     ang_vel_reward_scale = -0.1
     distance_to_goal_reward_scale = 20.0
+    distance_to_follower_reward_scale = 15.0
+    attitude_to_follower_reward_scale = 5.0
+    # reward-relaed parameters
+    distance_threshold = 1.5
 
 
     # Action Noise Model for Domain Randomization

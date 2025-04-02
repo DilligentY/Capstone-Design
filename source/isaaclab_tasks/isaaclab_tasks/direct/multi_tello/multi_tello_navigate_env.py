@@ -210,17 +210,68 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
 
     def _get_rewards(self) -> dict[str, torch.Tensor]:
-        # compute reward dictionary
-        goal_dist = torch.tensor(1, dtype=torch.float, device=self.device)
-        rew_dist = torch.tensor(1, dtype=torch.float, device=self.device)
+        # compute Leader Reward
+        lin_vel_leader = torch.sum(torch.square(self.leader_lin_vel_b), dim=1)
+        ang_vel_leader = torch.sum(torch.square(self.leader_ang_vel_b), dim=1)
+        distance_to_goal = torch.linalg.norm(self.desired_pos_b, dim=1)
+        distance_to_goal_mapped = 1 - torch.tanh(distance_to_goal)
+        # compute Left Reward
+        lin_vel_left = torch.sum(torch.square(self.left_lin_vel_b), dim=1)
+        ang_vel_left = torch.sum(torch.square(self.left_ang_vel_b), dim=1)
+        distance_to_leader_left = torch.linalg.norm(self.pos_left_leader_b, dim=1)
+        distance_to_leader_left_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_left))
+        attitude_to_leader_left = torch.linalg.norm(self.rot_left_leader_b, dim=1)
+        # compute Right Reward
+        lin_vel_right = torch.sum(torch.square(self.right_lin_vel_b), dim=1)
+        ang_vel_right = torch.sum(torch.square(self.right_ang_vel_b), dim=1)
+        distance_to_leader_right = torch.linalg.norm(self.pos_right_leader_b, dim=1)
+        distance_to_leader_right_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_right))
+        attitude_to_leader_right = torch.linalg.norm(self.rot_right_leader_b, dim=1)
+
+        # make Reward Dictionary
+        reward = {
+            "leader" : torch.sum(
+                torch.stack(
+                    [
+                        self.cfg.lin_vel_reward_scale * lin_vel_leader,
+                        self.cfg.ang_vel_reward_scale * ang_vel_leader,
+                        self.cfg.distance_to_goal_reward_scale * distance_to_goal_mapped
+                    ]
+                )
+            ),
+
+            "left" : torch.sum(
+                torch.stack(
+                    [
+                        self.cfg.lin_vel_reward_scale * lin_vel_left,
+                        self.cfg.ang_vel_reward_scale * ang_vel_left,
+                        self.cfg.distance_to_follower_reward_scale * distance_to_leader_left_mapped,
+                        self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_left
+                    ]
+                )
+            ),
+
+            "right" : torch.sum(
+                torch.stack(
+                    [
+                        self.cfg.lin_vel_reward_scale * lin_vel_right,
+                        self.cfg.ang_vel_reward_scale * ang_vel_right,
+                        self.cfg.distance_to_follower_reward_scale * distance_to_leader_right_mapped,
+                        self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_right
+                    ]
+                )
+            )
+
+        }
 
         # log reward components
         if "log" not in self.extras:
             self.extras["log"] = dict()
-        self.extras["log"]["dist_reward"] = rew_dist.mean()
-        self.extras["log"]["dist_goal"] = goal_dist.mean()
+        self.extras["log"]["leader_reward"] = reward["leader"]
+        self.extras["log"]["left_reward"] = reward["left"]
+        self.extras["log"]["right_reward"] = reward["right"]
 
-        return {"leader": rew_dist, "left": rew_dist, "right": rew_dist}
+        return reward
 
 
     def _get_dones(self) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
