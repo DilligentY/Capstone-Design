@@ -228,39 +228,29 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         distance_to_leader_right_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_right))
         attitude_to_leader_right = torch.linalg.norm(self.rot_right_leader_b, dim=1)
 
+
         # make Reward Dictionary
         reward = {
-            "leader" : torch.sum(
-                torch.stack(
-                    [
-                        self.cfg.lin_vel_reward_scale * lin_vel_leader,
-                        self.cfg.ang_vel_reward_scale * ang_vel_leader,
-                        self.cfg.distance_to_goal_reward_scale * distance_to_goal_mapped
-                    ]
-                )
-            ),
+            "leader" : (
+                self.cfg.lin_vel_reward_scale * lin_vel_leader
+                + self.cfg.ang_vel_reward_scale * ang_vel_leader
+                + self.cfg.distance_to_goal_reward_scale * distance_to_goal_mapped
+            ).view(self.num_envs, 1),
 
-            "left" : torch.sum(
-                torch.stack(
-                    [
-                        self.cfg.lin_vel_reward_scale * lin_vel_left,
-                        self.cfg.ang_vel_reward_scale * ang_vel_left,
-                        self.cfg.distance_to_follower_reward_scale * distance_to_leader_left_mapped,
-                        self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_left
-                    ]
-                )
-            ),
+            "left" : (
+                self.cfg.lin_vel_reward_scale * lin_vel_left
+                + self.cfg.ang_vel_reward_scale * ang_vel_left
+                + self.cfg.distance_to_follower_reward_scale * distance_to_leader_left_mapped
+                + self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_left
+            ).view(self.num_envs, 1),
+                
 
-            "right" : torch.sum(
-                torch.stack(
-                    [
-                        self.cfg.lin_vel_reward_scale * lin_vel_right,
-                        self.cfg.ang_vel_reward_scale * ang_vel_right,
-                        self.cfg.distance_to_follower_reward_scale * distance_to_leader_right_mapped,
-                        self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_right
-                    ]
-                )
-            )
+            "right" : (
+                self.cfg.lin_vel_reward_scale * lin_vel_right
+                + self.cfg.ang_vel_reward_scale * ang_vel_right
+                + self.cfg.distance_to_follower_reward_scale * distance_to_leader_right_mapped
+                + self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_right
+            ).view(self.num_envs, 1)
 
         }
 
