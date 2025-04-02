@@ -17,7 +17,7 @@ from isaaclab.markers import VisualizationMarkers
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, saturate
 
-from .multi_tello_navigate_cfg import MultiTelloNavigateEnvCfg
+from .multi_tello_navigate_env_cfg import MultiTelloNavigateEnvCfg
 
 
 class MultiTelloNavigateEnv(DirectMARLEnv):
@@ -46,7 +46,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # default goal positions
         self.goal_rot = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
         self.goal_rot[:, 0] = 1.0
-        self.goal_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device).uniform_(-2.0, 2.0)
+        self.goal_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
         
         # initialize goal marker
         self.goal_markers = VisualizationMarkers(self.cfg.goal_object_cfg)
@@ -114,6 +114,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
 
     def _get_observations(self) -> dict[str, torch.Tensor]:
+        # Decentralized Information for each Agent
         observations = {
             'leader' : torch.cat(
                 (
@@ -177,6 +178,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
 
     def _get_states(self) -> torch.Tensor:
+        # Centralized Information for all Agents
         states = torch.cat(
             (
                 # ---- Leader Agent (18) ----
@@ -218,7 +220,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.extras["log"]["dist_reward"] = rew_dist.mean()
         self.extras["log"]["dist_goal"] = goal_dist.mean()
 
-        return {"right_hand": rew_dist, "left_hand": rew_dist}
+        return {"leader": rew_dist, "left": rew_dist, "right": rew_dist}
 
 
     def _get_dones(self) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
@@ -256,14 +258,15 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # reset goals
         self._reset_target_pose(env_ids)
 
-        # reset Leader, Follower Quadrotor
+        # reset Leader, Follower Quadrotor and add noise to position
         for robot in self.scene.articulations.values():
             joint_pos = robot.data.default_joint_pos[env_ids]
             joint_vel = robot.data.default_joint_vel[env_ids]
             default_root_state = robot.data.default_root_state[env_ids]
-            default_root_state[:, :3] += self._terrain.env_origins[env_ids]
+            pos_noise = sample_uniform(-1.0, 1.0, (len(env_ids), 3), device=self.device)
+            default_root_state[:, :3] += self.cfg.reset_dof_pos_noise * pos_noise + self._terrain.env_origins[env_ids]
             robot.write_root_pose_to_sim(default_root_state[:, :7], env_ids)
-            robot.write_root_velocity_to_sim(default_root_state[:, :7], env_ids)
+            robot.write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
             robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 
         self._compute_intermediate_values()
@@ -287,8 +290,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
 
     def _reset_target_pose(self, env_ids):
-        # reset goal rotation
-        self.goal_pos += self._terrain.env_origins[env_ids, :2]
+        # reset only goal position
+        self.goal_pos[env_ids, :2]  = torch.zeros_like(self.goal_pos[env_ids, :2]).uniform_(-3.0, 3.0)
+        self.goal_pos[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
         self.goal_pos[env_ids, 2] = torch.zeros_like(self.goal_pos[env_ids, 2]).uniform_(0.5, 1.0)
 
         # update goal pose and markers
@@ -300,7 +304,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.leader_rot = self.leader.data.root_state_w[:, 3:7]
         self.leader_lin_vel_b = self.leader.data.root_lin_vel_b
         self.leader_ang_vel_b = self.leader.data.root_ang_vel_b
-        self.leader_altitude = self.leader.data.root_state_w[:, 2]
+        self.leader_altitude = self.leader.data.root_state_w[:, 2].unsqueeze(-1)
         self.desired_pos_b, _ = subtract_frame_transforms(self.leader_pos, self.leader_rot, self.goal_pos)
 
         # data for left quadrotor's observation
@@ -308,14 +312,14 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.left_rot = self.left.data.root_state_w[:, 3:7]
         self.left_lin_vel_b = self.left.data.root_lin_vel_b
         self.left_ang_vel_b = self.left.data.root_ang_vel_b
-        self.left_altitude = self.left.data.root_state_w[:, 2]
+        self.left_altitude = self.left.data.root_state_w[:, 2].unsqueeze(-1)
 
         # data for right quadrotor's observation
         self.right_pos = self.right.data.root_state_w[:, :3]
         self.right_rot = self.right.data.root_state_w[:, 3:7]
         self.right_lin_vel_b = self.right.data.root_lin_vel_b
         self.right_ang_vel_b = self.right.data.root_ang_vel_b
-        self.right_altitude = self.right.data.root_state_w[:, 2]
+        self.right_altitude = self.right.data.root_state_w[:, 2].unsqueeze(-1)
 
         # data for quadrotor's States
         self.dist_leader_left = torch.linalg.norm(self.leader_pos - self.left_pos, dim=-1)
