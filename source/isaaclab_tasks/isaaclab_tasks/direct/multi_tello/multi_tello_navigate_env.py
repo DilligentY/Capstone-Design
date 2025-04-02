@@ -211,8 +211,13 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
     def _get_rewards(self) -> dict[str, torch.Tensor]:
         # compute reward dictionary
-        goal_dist = torch.tensor(1, dtype=torch.float, device=self.device)
-        rew_dist = torch.tensor(1, dtype=torch.float, device=self.device)
+        # goal_dist = torch.tensor(1, dtype=torch.float, device=self.device)
+        # rew_dist = torch.tensor(1, dtype=torch.float, device=self.device)
+
+        goal_dist = torch.zeros((self.num_envs, 1), dtype=torch.float, device=self.device)
+        rew_dist = torch.zeros((self.num_envs, 1), dtype=torch.float, device=self.device)
+        
+
 
         # log reward components
         if "log" not in self.extras:
