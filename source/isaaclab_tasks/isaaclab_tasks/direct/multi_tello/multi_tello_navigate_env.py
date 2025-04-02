@@ -257,9 +257,10 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # log reward components
         if "log" not in self.extras:
             self.extras["log"] = dict()
-        self.extras["log"]["leader_reward"] = reward["leader"]
-        self.extras["log"]["left_reward"] = reward["left"]
-        self.extras["log"]["right_reward"] = reward["right"]
+        self.extras["log"]["leader_reward"] = reward["leader"].mean()
+        self.extras["log"]["left_reward"] = reward["left"].mean()
+        self.extras["log"]["right_reward"] = reward["right"].mean()
+        self.extras.update()
 
         return reward
 
@@ -267,7 +268,6 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
     def _get_dones(self) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         # Update Agent States
         self._compute_intermediate_values()
-
         # reset when out of height or collision
         out_of_height = torch.logical_or(torch.max(self.h) > 2.0, torch.min(self.h) < 0.1)
         collision = torch.min(self.d) < 0.5

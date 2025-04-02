@@ -157,7 +157,7 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     
     left_robot_cfg    : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_left").replace(
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, -2.0, 0.5),
+            pos=(0.0, -1.5, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
             joint_pos={
                 ".*": 0.0,
@@ -173,7 +173,7 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
 
     right_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_right").replace(
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, 2.0, 0.5),
+            pos=(0.0, 1.5, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
             joint_pos={
                 ".*": 0.0,
@@ -263,18 +263,18 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     # Observation Noise Model for Domain Randomization
     observation_noise_model = {
         "leader" : NoiseModelWithAdditiveBiasCfg(
-            noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.001, operation="add"),
-            bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.0001, operation="abs"),
+            noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.01, operation="add"),
+            bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.001, operation="abs"),
         ),
 
         "left" : NoiseModelWithAdditiveBiasCfg(
-            noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.001, operation="add"),
-            bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.0001, operation="abs"),
+            noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.01, operation="add"),
+            bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.001, operation="abs"),
         ),
         
         "right" : NoiseModelWithAdditiveBiasCfg(
-            noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.001, operation="add"),
-            bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.0001, operation="abs"),
+            noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.01, operation="add"),
+            bias_noise_cfg=GaussianNoiseCfg(mean=0.0, std=0.001, operation="abs"),
         )
     }
 

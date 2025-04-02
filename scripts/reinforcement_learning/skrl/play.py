@@ -24,7 +24,7 @@ parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default="Isaac-Tello-Direct-v0", help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isaac-Multi-Tello-Navigate-Direct-v0", help="Name of the task.")
 parser.add_argument("--checkpoint", type=str, default="C:/IsaacLab/logs/skrl/quadcopter_direct/2025-03-26_10-51-52_ppo_torch/checkpoints/agent_24000.pt", help="Path to model checkpoint.")
 parser.add_argument(
     "--use_pretrained_checkpoint",
@@ -41,7 +41,7 @@ parser.add_argument(
 parser.add_argument(
     "--algorithm",
     type=str,
-    default="PPO",
+    default="MAPPO",
     choices=["AMP", "PPO", "IPPO", "MAPPO"],
     help="The RL algorithm used for training the skrl agent.",
 )
