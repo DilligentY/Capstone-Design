@@ -230,7 +230,6 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         attitude_to_leader_right = quat_error_magnitude(self.right_rot, self.leader_rot)
         attitude_to_leader_right_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_right / torch.pi))
 
-
         # make Reward Dictionary
         reward = {
             "leader" : (
