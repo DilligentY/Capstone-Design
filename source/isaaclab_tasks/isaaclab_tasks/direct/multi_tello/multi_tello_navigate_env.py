@@ -15,7 +15,7 @@ from isaaclab.assets import Articulation, RigidObject
 from isaaclab.envs import DirectMARLEnv
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
-from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, saturate
+from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, quat_error_magnitude
 
 from .multi_tello_navigate_env_cfg import MultiTelloNavigateEnvCfg
 
@@ -220,13 +220,15 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         ang_vel_left = torch.sum(torch.square(self.left_ang_vel_b), dim=1)
         distance_to_leader_left = torch.linalg.norm(self.pos_left_leader_b, dim=1)
         distance_to_leader_left_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_left))
-        attitude_to_leader_left = torch.linalg.norm(self.rot_left_leader_b, dim=1)
+        attitude_to_leader_left = quat_error_magnitude(self.left_rot, self.leader_rot)
+        attitude_to_leader_left_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_left / torch.pi))
         # compute Right Reward
         lin_vel_right = torch.sum(torch.square(self.right_lin_vel_b), dim=1)
         ang_vel_right = torch.sum(torch.square(self.right_ang_vel_b), dim=1)
         distance_to_leader_right = torch.linalg.norm(self.pos_right_leader_b, dim=1)
         distance_to_leader_right_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_right))
-        attitude_to_leader_right = torch.linalg.norm(self.rot_right_leader_b, dim=1)
+        attitude_to_leader_right = quat_error_magnitude(self.right_rot, self.leader_rot)
+        attitude_to_leader_right_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_right / torch.pi))
 
 
         # make Reward Dictionary
@@ -241,7 +243,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                 self.cfg.lin_vel_reward_scale * lin_vel_left
                 + self.cfg.ang_vel_reward_scale * ang_vel_left
                 + self.cfg.distance_to_follower_reward_scale * distance_to_leader_left_mapped
-                + self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_left
+                + self.cfg.attitude_to_follower_reward_scale_2 * attitude_to_leader_left_mapped
             ).view(self.num_envs, 1),
                 
 
@@ -249,7 +251,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                 self.cfg.lin_vel_reward_scale * lin_vel_right
                 + self.cfg.ang_vel_reward_scale * ang_vel_right
                 + self.cfg.distance_to_follower_reward_scale * distance_to_leader_right_mapped
-                + self.cfg.attitude_to_follower_reward_scale * attitude_to_leader_right
+                + self.cfg.attitude_to_follower_reward_scale_2 * attitude_to_leader_right_mapped
             ).view(self.num_envs, 1)
 
         }
@@ -260,7 +262,6 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.extras["log"]["leader_reward"] = reward["leader"].mean()
         self.extras["log"]["left_reward"] = reward["left"].mean()
         self.extras["log"]["right_reward"] = reward["right"].mean()
-        self.extras.update()
 
         return reward
 
@@ -371,11 +372,10 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.d = torch.cat((self.dist_leader_left, self.dist_leader_right, self.dist_left_right), dim=-1)
         self.h = torch.cat((self.leader_altitude, self.left_altitude, self.right_altitude), dim=-1)
 
-        self.pos_left_leader_b, self.rot_left_leader_b = subtract_frame_transforms(self.leader_pos, self.leader_rot, 
-                                                                                   self.left_pos, self.left_rot)
-        self.pos_right_leader_b, self.rot_right_leader_b = subtract_frame_transforms(self.leader_pos, self.leader_rot,
-                                                                                     self.right_pos, self.right_rot)
-        
+        self.pos_left_leader_b, _ = subtract_frame_transforms(self.leader_pos, self.leader_rot, 
+                                                                self.left_pos, self.left_rot)
+        self.pos_right_leader_b, _ = subtract_frame_transforms(self.leader_pos, self.leader_rot,
+                                                                self.right_pos, self.right_rot)
 
     
 

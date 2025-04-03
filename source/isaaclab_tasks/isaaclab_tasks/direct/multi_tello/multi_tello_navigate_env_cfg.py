@@ -236,8 +236,9 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     lin_vel_reward_scale = -0.5
     ang_vel_reward_scale = -0.1
     distance_to_goal_reward_scale = 20.0
-    distance_to_follower_reward_scale = 15.0
-    attitude_to_follower_reward_scale = 5.0
+    distance_to_follower_reward_scale = -10.0
+    attitude_to_follower_reward_scale_1 = 9.0
+    attitude_to_follower_reward_scale_2 = 5.0
     # reward-relaed parameters
     distance_threshold = 1.5
 
