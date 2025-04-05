@@ -119,7 +119,7 @@ from isaaclab.utils import configclass
 @configclass
 class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
     # env
-    decimation = 2
+    decimation = 1
     episode_length_s = 10.0
     possible_agents = ["left", "right"]
     action_spaces = {"left" : 4, "right" : 4}

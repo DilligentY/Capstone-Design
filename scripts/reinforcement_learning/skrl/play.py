@@ -23,9 +23,9 @@ parser.add_argument("--video_length", type=int, default=200, help="Length of the
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default="Isaac-Multi-Tello-Navigate-Direct-v0", help="Name of the task.")
-parser.add_argument("--checkpoint", type=str, default="C:/IsaacLab/logs/skrl/quadcopter_direct/2025-03-26_10-51-52_ppo_torch/checkpoints/agent_24000.pt", help="Path to model checkpoint.")
+parser.add_argument("--num_envs", type=int, default=5, help="Number of environments to simulate.")
+parser.add_argument("--task", type=str, default="Isaac-Multi-Tello-Payload-Direct-v0", help="Name of the task.")
+parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
 parser.add_argument(
     "--use_pretrained_checkpoint",
     action="store_true",

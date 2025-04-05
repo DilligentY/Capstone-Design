@@ -86,6 +86,15 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
 
     def _pre_physics_step(self, actions: dict[str, torch.Tensor]) -> None:
         self.actions = actions
+
+        # 1. 액션 assign
+        # 2. gravity 보정
+        # 3. limit에 맞도록 clamp
+
+        gravity_bonus = self._gravity_magnitude * self.scene.physics_dt
+        
+        self.left_actions[:, 2] += gravity_bonus
+        self.right_actions[:, 2] += gravity_bonus
         
         self.left_actions[:, :] = self.actions["left"].clamp(-1.0, 1.0)
         self.left_torque[:, 0, :] = self.cfg.torque_scale * self.left_actions[:, 1:]
@@ -98,8 +107,11 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
 
     def _apply_action(self) -> None:
         # Assign Actions each Agent
-        self.left.set_external_force_and_torque(self.left_thrust, self.left_torque, body_ids=self._left_body_id)
-        self.right.set_external_force_and_torque(self.right_thrust, self.right_torque, body_ids=self._right_body_id)
+        vel = torch.tensor([0.0, 0.0, 1.5, 0.0, 0.0, 0.0], device=self.device).unsqueeze(0).repeat(self.num_envs, 1)
+        self.left.write_root_velocity_to_sim(vel, self.left._ALL_INDICES)
+        self.right.write_root_velocity_to_sim(vel, self.right._ALL_INDICES)
+
+        print(f"action : {vel[0, :]}")
 
 
     def _get_observations(self) -> dict[str, torch.Tensor]:
@@ -139,6 +151,7 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
                 dim=-1
             ),
         }
+        print(f"left_vel : {self.left.data.root_lin_vel_w[0, :]}, right_vel : {self.right.data.root_lin_vel_w[0, :]}")
 
         return observations
 
@@ -170,33 +183,23 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         # compute Left Reward
         lin_vel_left = torch.sum(torch.square(self.left_lin_vel_b), dim=1)
         ang_vel_left = torch.sum(torch.square(self.left_ang_vel_b), dim=1)
-        # distance_to_leader_left = torch.linalg.norm(self.pos_left_leader_b, dim=1)
-        # distance_to_leader_left_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_left))
-        # attitude_to_leader_left = quat_error_magnitude(self.left_rot, self.leader_rot)
-        # attitude_to_leader_left_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_left / torch.pi))
         # compute Right Reward
         lin_vel_right = torch.sum(torch.square(self.right_lin_vel_b), dim=1)
         ang_vel_right = torch.sum(torch.square(self.right_ang_vel_b), dim=1)
-        # distance_to_leader_right = torch.linalg.norm(self.pos_right_leader_b, dim=1)
-        # distance_to_leader_right_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_right))
-        # attitude_to_leader_right = quat_error_magnitude(self.right_rot, self.leader_rot)
-        # attitude_to_leader_right_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_right / torch.pi))
 
         # make Reward Dictionary
         reward = {
             "left" : (
                 self.cfg.lin_vel_reward_scale * lin_vel_left
                 + self.cfg.ang_vel_reward_scale * ang_vel_left
-                # + self.cfg.distance_to_follower_reward_scale * distance_to_leader_left_mapped
-                # + self.cfg.attitude_to_follower_reward_scale_2 * attitude_to_leader_left_mapped
+
             ).view(self.num_envs, 1),
                 
 
             "right" : (
                 self.cfg.lin_vel_reward_scale * lin_vel_right
                 + self.cfg.ang_vel_reward_scale * ang_vel_right
-                # + self.cfg.distance_to_follower_reward_scale * distance_to_leader_right_mapped
-                # + self.cfg.attitude_to_follower_reward_scale_2 * attitude_to_leader_right_mapped
+
             ).view(self.num_envs, 1)
 
         }
@@ -215,8 +218,8 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         self._compute_intermediate_values()
         # reset when out of height or collision
         out_of_height = torch.logical_or(torch.max(self.h) > 2.0, torch.min(self.h) < 0.1)
-        collision = torch.min(self.d) < 0.5
-        truncation = torch.logical_or(out_of_height, collision)
+        # collision = torch.min(self.d) < 0.5
+        truncation = out_of_height
         # reset when episode ends
         time_out = self.episode_length_buf >= self.max_episode_length - 1
 
@@ -231,6 +234,9 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         super()._reset_idx(env_ids)
         self.left.reset(env_ids)
         self.right.reset(env_ids)
+        # reset articulation actions and correct for gravity
+        self.left_actions     = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
+        self.right_actions    = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
 
         if len(env_ids) == self.num_envs:
             # Spread out the resets to avoid spikes in training when many environments reset at a similar time
@@ -301,7 +307,7 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         self.dist_left_right = torch.linalg.norm(self.left_pos - self.right_pos, dim=-1)
 
         # data for Done & Reward calculation
-        self.d = torch.cat((self.dist_left_right), dim=-1)
+        # self.d = torch.cat((self.dist_left_right), dim=-1)
         self.h = torch.cat((self.left_altitude, self.right_altitude), dim=-1)
 
     
