@@ -24,6 +24,8 @@ TELLOAPPROX_CFG = ArticulationCfg(
             disable_gravity=False,
             max_depenetration_velocity=10.0,
             enable_gyroscopic_forces=True,
+            max_linear_velocity=4.0,
+            max_angular_velocity=65.3
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
             enabled_self_collisions=False,

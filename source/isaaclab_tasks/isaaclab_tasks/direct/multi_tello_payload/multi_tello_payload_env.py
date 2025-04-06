@@ -28,13 +28,9 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
    
         self.left_actions     = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
         self.right_actions    = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
-        
-        self.left_torque      = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
-        self.right_torque     = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
-        
-        self.left_thrust     = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
-        self.right_thrust    = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
 
+        self.left_filtered_actions = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
+        self.right_filtered_actions = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
 
         # used to compare object position
         # self.in_hand_pos = self.object.data.default_root_state[:, 0:3].clone()
@@ -63,7 +59,7 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         
 
     def _setup_scene(self):
-        # add hand, in-hand object, and goal object
+        # add left, right quadrotor and goal object
         self.left = Articulation(self.cfg.left_robot_cfg)
         self.right = Articulation(self.cfg.right_robot_cfg)
         # self.object = RigidObject(self.cfg.object_cfg)
@@ -87,31 +83,44 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
     def _pre_physics_step(self, actions: dict[str, torch.Tensor]) -> None:
         self.actions = actions
 
-        # 1. 액션 assign
-        # 2. gravity 보정
-        # 3. limit에 맞도록 clamp
+        # 1. 정규화 방안 생각하기.
+        # 2. limit에 맞도록 clamp 작업 수행하기.
 
-        gravity_bonus = self._gravity_magnitude * self.scene.physics_dt
-        
-        self.left_actions[:, 2] += gravity_bonus
-        self.right_actions[:, 2] += gravity_bonus
-        
-        self.left_actions[:, :] = self.actions["left"].clamp(-1.0, 1.0)
-        self.left_torque[:, 0, :] = self.cfg.torque_scale * self.left_actions[:, 1:]
-        self.left_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self.left_actions[:, 0] + 1.0) / 2.0
-        
-        self.right_actions[:, :] = self.actions["right"].clamp(-1.0, 1.0)
-        self.right_torque[:, 0, :] = self.cfg.torque_scale * self.right_actions[:, 1:]
-        self.right_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self.right_actions[:, 0] + 1.0) / 2.0
+        # Left quadrotor velocity
+        self.left_actions[:, :] = self.actions["left"]
+        self.left_actions[:, 2] += self._gravity_magnitude * self.scene.physics_dt
 
+        # Right quadrotor velocity
+        self.right_actions[:, :] = self.actions["right"]
+        self.right_actions[:, 2] += self._gravity_magnitude * self.scene.physics_dt
+        
 
     def _apply_action(self) -> None:
         # Assign Actions each Agent
-        vel = torch.tensor([0.0, 0.0, 1.5, 0.0, 0.0, 0.0], device=self.device).unsqueeze(0).repeat(self.num_envs, 1)
-        self.left.write_root_velocity_to_sim(vel, self.left._ALL_INDICES)
-        self.right.write_root_velocity_to_sim(vel, self.right._ALL_INDICES)
 
-        print(f"action : {vel[0, :]}")
+        left_vel = torch.concat((
+            self.left.data.root_lin_vel_w,
+            self.left.data.root_ang_vel_w[:, 2].unsqueeze(-1)
+            ),
+            dim=1
+        )
+        right_vel = torch.concat((
+            self.right.data.root_lin_vel_w,
+            self.right.data.root_ang_vel_w[:, 2].unsqueeze(-1)
+            ),
+            dim=1
+        )
+        left_applied_actions  = Low_Pass_Filter(left_vel, self.left_actions)
+        right_applied_actions = Low_Pass_Filter(right_vel, self.right_actions)
+
+        self.left_filtered_actions[:, :3] = left_applied_actions[:, :3]
+        self.left_filtered_actions[:, 5] = left_applied_actions[:, 3]
+
+        self.right_filtered_actions[:, :3] = right_applied_actions[:, :3]
+        self.right_filtered_actions[:, 5] = right_applied_actions[:, 3]
+
+        self.left.write_root_velocity_to_sim(self.left_filtered_actions, self.left._ALL_INDICES)
+        self.right.write_root_velocity_to_sim(self.right_filtered_actions, self.right._ALL_INDICES)
 
 
     def _get_observations(self) -> dict[str, torch.Tensor]:
@@ -235,9 +244,11 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         self.left.reset(env_ids)
         self.right.reset(env_ids)
         # reset articulation actions and correct for gravity
-        self.left_actions     = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
-        self.right_actions    = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
-
+        self.left_actions     = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
+        self.right_actions    = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
+        self.left_filtered_actions = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
+        self.right_filtered_actions = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
+        # reset episode length buffer
         if len(env_ids) == self.num_envs:
             # Spread out the resets to avoid spikes in training when many environments reset at a similar time
             self.episode_length_buf = torch.randint_like(self.episode_length_buf, high=int(self.max_episode_length))
@@ -327,3 +338,7 @@ def randomize_rotation(rand0, rand1, x_unit_tensor, y_unit_tensor):
     return quat_mul(
         quat_from_angle_axis(rand0 * np.pi, x_unit_tensor), quat_from_angle_axis(rand1 * np.pi, y_unit_tensor)
     )
+
+def Low_Pass_Filter(current_value, target_value, omega=1/0.05, dt=0.01):
+    coeff = 1/(1 + omega * dt)
+    return coeff * (current_value + omega * dt * target_value)
