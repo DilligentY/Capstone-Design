@@ -11,15 +11,21 @@ import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets import ArticulationCfg
 from isaaclab.utils.assets import ISAAC_NUCLEUS_USER_DIR
-
 ##
 # Configuration
 ##
 
-TELLOAPPROX_CFG = ArticulationCfg(
-    prim_path="{ENV_REGEX_NS}/Robot",
+# TELLOPAYLOAD_CFG = ArticulationCfg(
+#     prim_path="{ENV_REGEX_NS}/Robot",
+#     spawn=sim_utils.UsdFileCfg(
+#         usd_path=f"{ISAAC_NUCLEUS_USER_DIR}/Robots/Tello_approx/cf2x_payload.usd"
+#     )
+# )
+
+
+TELLOPAYLOAD_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAAC_NUCLEUS_USER_DIR}/Robots/Tello_approx/cf2x_modified.usd",
+        usd_path=f"{ISAAC_NUCLEUS_USER_DIR}/Robots/Tello_approx/cf2x_payload_final.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
             max_depenetration_velocity=10.0,
@@ -42,6 +48,16 @@ TELLOAPPROX_CFG = ArticulationCfg(
         joint_pos={
             ".*": 0.0,
         },
+        joint_vel={
+            "m1_joint_left": 200.0,
+            "m2_joint_left": -200.0,
+            "m3_joint_left": 200.0,
+            "m4_joint_left": -200.0,
+            "m1_joint_right": 200.0,
+            "m2_joint_right": -200.0,
+            "m3_joint_right": 200.0,
+            "m4_joint_right": -200.0,
+        },
     ),
     actuators={
         "dummy": ImplicitActuatorCfg(
@@ -52,4 +68,7 @@ TELLOAPPROX_CFG = ArticulationCfg(
     },
 )
 
-"""Configuration for the Tello Edu by Crazyfly quadcopter."""
+# """Configuration for the Tello Edu by Crazyfly quadcopter."""
+
+
+# """Configuration for the Tello Edu by Crazyfly quadcopter."""

@@ -32,6 +32,9 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 from isaaclab.sim import SimulationCfg, SimulationContext
+from isaacsim.robot_setup.assembler import RobotAssembler,AssembledBodies 
+from isaacsim.core.prims import SingleArticulation
+import numpy as np
 
 
 def main():
@@ -47,6 +50,23 @@ def main():
     sim.reset()
     # Now we are ready!
     print("[INFO]: Setup complete...")
+
+    robot_assembler = RobotAssembler()
+    base_robot_path = "/World/cube"
+    attach_robot_path = "/World/cf2x_modified"
+    base_robot_mount_frame = "/assembler_mount_frame"
+    attach_robot_mount_frame = "/body"
+    fixed_joint_offset = np.array([0.0,-0.46,0.0])
+    fixed_joint_orient = np.array([1.0,0.0,0.0,0.0])
+    assembled_bodies = robot_assembler.assemble_rigid_bodies(
+        base_robot_path,
+        attach_robot_path,
+        base_robot_mount_frame,
+        attach_robot_mount_frame,
+        fixed_joint_offset,
+        fixed_joint_orient,
+        mask_all_collisions = True
+)
 
     # Simulate physics
     while simulation_app.is_running():
