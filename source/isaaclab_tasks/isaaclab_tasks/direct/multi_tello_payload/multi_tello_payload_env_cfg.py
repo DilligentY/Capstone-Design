@@ -6,7 +6,6 @@
 
 from isaaclab_assets.robots.shadow_hand import SHADOW_HAND_CFG
 from isaaclab_assets import TELLOAPPROX_CFG, TELLOPAYLOAD_CFG
-from isaaclab.utils.assets import ISAAC_NUCLEUS_USER_DIR, ISAAC_NUCLEUS_DIR
 
 
 import isaaclab.envs.mdp as mdp
@@ -154,7 +153,8 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
     )
 
     # robot
-    left_robot_cfg    : ArticulationCfg = TELLOPAYLOAD_CFG.replace(prim_path="/World/envs/env_.*/Follower_left").replace(
+    
+    left_robot_cfg    : ArticulationCfg = TELLOPAYLOAD_CFG.replace(prim_path="/World/envs/env_.*/Robot").replace(
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0.0, -1.5, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
@@ -162,71 +162,21 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
                 ".*": 0.0,
             },
             joint_vel={
-                "m1_joint": 200.0,
-                "m2_joint": -200.0,
-                "m3_joint": 200.0,
-                "m4_joint": -200.0,
-            },
-        )
-    )
-
-    right_robot_cfg   : ArticulationCfg = TELLOPAYLOAD_CFG.replace(prim_path="/World/envs/env_.*/Follower_right").replace(
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, 1.5, 0.5),
-            rot=(1.0, 0.0, 0.0, 0.0),
-            joint_pos={
-                ".*": 0.0,
-            },
-            joint_vel={
-                "m1_joint": 200.0,
-                "m2_joint": -200.0,
-                "m3_joint": 200.0,
-                "m4_joint": -200.0,
+                "m1_joint_left": 200.0,
+                "m2_joint_left": -200.0,
+                "m3_joint_left": 200.0,
+                "m4_joint_left": -200.0,
+                "m1_joint_right": 200.0,
+                "m2_joint_right": -200.0,
+                "m3_joint_right": 200.0,
+                "m4_joint_right": -200.0,
             },
         )
     )
     
-    # object_cfg : RigidObjectCfg = RigidObjectCfg(
-    #     prim_path="World/envs/env_.*/object",
-    #     spawn=sim_utils.UsdFileCfg(
-    #     usd_path=f"{ISAAC_NUCLEUS_USER_DIR}/Robots/payload/payload_01.usd",
-    #     rigid_props=sim_utils.RigidBodyPropertiesCfg(
-    #         disable_gravity=False,
-    #         max_depenetration_velocity=10.0,
-    #         enable_gyroscopic_forces=True,
-    #         solver_position_iteration_count=4,
-    #         solver_velocity_iteration_count=0,
-    #         sleep_threshold=0.005,
-    #         stabilization_threshold=0.0025,
-    #         max_linear_velocity=4.0,
-    #         max_angular_velocity=65.3,
-    #         ),
-    #     mass_props=sim_utils.MassPropertiesCfg(mass=0.5)
-    #     )
-    # )
-
-    object_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/object",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(
-                kinematic_enabled=False,
-                disable_gravity=False,
-                enable_gyroscopic_forces=True,
-                solver_position_iteration_count=8,
-                solver_velocity_iteration_count=0,
-                sleep_threshold=0.005,
-                stabilization_threshold=0.0025,
-                max_depenetration_velocity=1000.0,
-            ),
-            mass_props=sim_utils.MassPropertiesCfg(density=400.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled=True),
-            scale=(0.8, 0.8, 0.8),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
-    )
 
     # # in-hand object : 추후 Payload Task에서 추가할 것
+    
     # object_cfg: RigidObjectCfg = RigidObjectCfg(
     #     prim_path="/World/envs/env_.*/object",
     #     spawn=sim_utils.SphereCfg(
@@ -260,8 +210,7 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
         },
     )
     # scene
-    scene : InteractiveSceneCfg = InteractiveSceneCfg(num_envs=2048, env_spacing=5.0, replicate_physics=True)
-
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=2048, env_spacing=5.0, replicate_physics=True)
 
     # reset
     reset_position_noise = 0.1  # range of position at reset
@@ -270,10 +219,6 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
     # robot constant parameters
     thrust_to_weight = 1.7
     torque_scale = 0.1
-    max_lin_vel_x = 0.5
-    max_lin_vel_y = 0.5
-    max_lin_vel_z = 0.3
-    max_ang_vel_z = 0.3
     # reward-related scales
     lin_vel_reward_scale = -0.5
     ang_vel_reward_scale = -0.1

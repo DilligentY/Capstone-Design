@@ -18,7 +18,6 @@ from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, quat_error_magnitude
 from .multi_tello_payload_env_cfg import MultiTelloPayloadEnvCfg
 import numpy as np
-from omni.isaac.dynamic_control import _dynamic_control
 
 
 class MultiTelloPayloadEnv(DirectMARLEnv):

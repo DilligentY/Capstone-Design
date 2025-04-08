@@ -80,6 +80,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
     robot = entities["tello"]
     env_id = robot._ALL_INDICES
     num_env = len(env_id)
+    cube_body = robot.find_bodies("cube")[0]
     left_body = robot.find_bodies("body_left")[0]
     right_body = robot.find_bodies("body_right")[0]
     _thrust_left = torch.zeros(num_env, 1, 3, device=robot.device)
@@ -100,6 +101,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             # we offset the root state by the origin since the states are written in simulation world frame
             # if this is not done, then the robots will be spawned at the (0, 0, 0) of the simulation world
             root_state = robot.data.default_root_state.clone()
+            root_state[:, :3] += origins
             robot.write_root_pose_to_sim(root_state[:, :7])
             robot.write_root_velocity_to_sim(root_state[:, 7:])
             # set joint positions with some noise
@@ -112,13 +114,25 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
         # Apply random action
         # -- generate random joint efforts
         efforts = torch.randn_like(robot.data.joint_pos) * 0.0
-        _thrust_left[:, :, 2] = (3.5 * (2.0 - robot.data.root_state_w[:, 2])).clamp(0.0, 10.0).view(num_env, 1)
-        _thrust_right[:, :, 2] = (3.5 * (2.0 - robot.data.root_state_w[:, 2])).clamp(0.0, 10.0).view(num_env, 1)
+        _thrust_left[:, :, 2] = (2.0 * (2.0 - robot.data.root_state_w[:, 2])).clamp(0.0, 10.0).view(num_env, 1)
+        _thrust_right[:, :, 2] = (1.0 * (2.0 - robot.data.root_state_w[:, 2])).clamp(0.0, 10.0).view(num_env, 1)
+        _torque[:, :, 1] = 0.67
+        _torque[:, :, 2] = 1.05
+
+
+        # print(f"Cube_att : {robot.data.body_state_w[0, cube_body, 3:7].tolist()}")
+        # print(f"Left_att : {robot.data.body_state_w[0, left_body, 3:7].tolist()}")
+        # print(f"Right_att : {robot.data.body_state_w[0, right_body, 3:7].tolist()}")
+
+        # print(f"Root_vel : {robot.data.root_lin_vel_w[0, :].tolist()}")
+        # print(f"Cube_vel : {robot.data.body_state_w[0, cube_body, 7:].tolist()}")
+        # print(f"Left_vel : {robot.data.body_state_w[0, left_body, 7:].tolist()}")
+        # print(f"Right_vel : {robot.data.body_state_w[0, right_body, 7:].tolist()}")
 
         # -- apply action to the robot
         # robot.set_joint_effort_target(efforts)
         robot.set_external_force_and_torque(_thrust_left, _torque, body_ids=left_body, env_ids=env_id)
-        robot.set_external_force_and_torque(_thrust_left, _torque, body_ids=right_body, env_ids=env_id)
+        robot.set_external_force_and_torque(_thrust_right, _torque, body_ids=right_body, env_ids=env_id)
         # -- write data to sim
         robot.write_data_to_sim()
         # Perform step
