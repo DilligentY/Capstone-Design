@@ -83,21 +83,27 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
     def _pre_physics_step(self, actions: dict[str, torch.Tensor]) -> None:
         self.actions = actions
 
-        # 1. 정규화 방안 생각하기.
-        # 2. limit에 맞도록 clamp 작업 수행하기.
-
         # Left quadrotor velocity
-        self.left_actions[:, :] = self.actions["left"]
+        self.left_actions[:, :]  = self.actions["left"].clone()
+        left_lin_vel = torch.linalg.norm(self.left_actions[:, :3], dim=1, keepdim=True) + 1e-7
+        clamp_left_lin_vel = torch.min(torch.ones_like(left_lin_vel), self.cfg.max_lin_vel / left_lin_vel)
+        
+        self.left_actions[:, :3] *= clamp_left_lin_vel
         self.left_actions[:, 2] += self._gravity_magnitude * self.scene.physics_dt
-
+        self.left_actions[:, 5] = torch.clamp(self.left_actions[:, 5], -self.cfg.max_ang_vel, self.cfg.max_ang_vel)
+         
         # Right quadrotor velocity
-        self.right_actions[:, :] = self.actions["right"]
+        self.right_actions[:, :]  = self.actions["right"].clone()
+        right_lin_vel = torch.linalg.norm(self.right_actions[:, :3], dim=1, keepdim=True) + 1e-7
+        clamp_right_lin_vel = torch.min(torch.ones_like(right_lin_vel), self.cfg.max_lin_vel / right_lin_vel)
+        
+        self.right_actions[:, :3] *= clamp_right_lin_vel
         self.right_actions[:, 2] += self._gravity_magnitude * self.scene.physics_dt
+        self.right_actions[:, 5] = torch.clamp(self.right_actions[:, 5], -self.cfg.max_ang_vel, self.cfg.max_ang_vel)
         
 
     def _apply_action(self) -> None:
-        # Assign Actions each Agent
-
+        # Assign Actions each Agent & Pre-Processing
         left_vel = torch.concat((
             self.left.data.root_lin_vel_w,
             self.left.data.root_ang_vel_w[:, 2].unsqueeze(-1)
@@ -338,7 +344,9 @@ def randomize_rotation(rand0, rand1, x_unit_tensor, y_unit_tensor):
     return quat_mul(
         quat_from_angle_axis(rand0 * np.pi, x_unit_tensor), quat_from_angle_axis(rand1 * np.pi, y_unit_tensor)
     )
-
+    
+    
+@torch.jit.script
 def Low_Pass_Filter(current_value, target_value, omega=1/0.05, dt=0.01):
     coeff = 1/(1 + omega * dt)
     return coeff * (current_value + omega * dt * target_value)

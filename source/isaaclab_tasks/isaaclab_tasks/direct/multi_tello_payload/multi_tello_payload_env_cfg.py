@@ -2,9 +2,6 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
-
-
-from isaaclab_assets.robots.shadow_hand import SHADOW_HAND_CFG
 from isaaclab_assets import TELLOAPPROX_CFG
 
 
@@ -156,7 +153,7 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
     
     left_robot_cfg    : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_left").replace(
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, -1.5, 0.5),
+            pos=(0.0, -1.0, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
             joint_pos={
                 ".*": 0.0,
@@ -172,7 +169,7 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
 
     right_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_right").replace(
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, 1.5, 0.5),
+            pos=(0.0, 1.0, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
             joint_pos={
                 ".*": 0.0,
@@ -186,6 +183,19 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
         )
     )
     
+    paydload_cfg : RigidObjectCfg = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/payload",
+        spawn=sim_utils.CuboidCfg(
+            size=(0.7, 2.0, 0.01),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8, 1.0, 0.0)),
+            physics_material=sim_utils.RigidBodyMaterialCfg(static_friction=0.8),
+            mass_props=sim_utils.MassPropertiesCfg(density=200.0)
+        ),
+        init_state=RigidObjectCfg.InitialStateCfg(
+            pos=(0.0, 0.0, 0.5),
+            rot=(1.0, 0.0, 0.0, 0.0)
+        )
+    )
 
     # # in-hand object : 추후 Payload Task에서 추가할 것
     
@@ -231,6 +241,8 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
     # robot constant parameters
     thrust_to_weight = 1.7
     torque_scale = 0.1
+    max_lin_vel = 4
+    max_ang_vel = 1.14
     # reward-related scales
     lin_vel_reward_scale = -0.5
     ang_vel_reward_scale = -0.1
