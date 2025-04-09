@@ -200,7 +200,6 @@ class TELLOEnv(DirectRLEnv):
             ang_vel_b : angular velocity vector based on body frame 
             projected_gravity_b : gravity vector based on body frame axis
             desired_pos_b : position of desired point based on body frame
-
         """
         altitude_robot = self._robot.data.root_state_w[:, 2]
         desired_pos_b, _ = subtract_frame_transforms(

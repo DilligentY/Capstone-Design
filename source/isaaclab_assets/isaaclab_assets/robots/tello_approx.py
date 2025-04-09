@@ -42,6 +42,12 @@ TELLOAPPROX_CFG = ArticulationCfg(
         joint_pos={
             ".*": 0.0,
         },
+        joint_vel={
+            "m1_joint": 200.0,
+            "m2_joint": -200.0,
+            "m3_joint": 200.0,
+            "m4_joint": -200.0,
+        },
     ),
     actuators={
         "dummy": ImplicitActuatorCfg(
