@@ -52,7 +52,7 @@ class TELLOEnvWindow(BaseEnvWindow):
 @configclass
 class CentralTELLOEnvCfg(DirectRLEnvCfg):
     # env information
-    episode_length_s = 20.0
+    episode_length_s = 100.0
     decimation = 2
     action_space = 4
     observation_space = 20
@@ -116,10 +116,10 @@ class CentralTELLOEnvCfg(DirectRLEnvCfg):
     torque_scale = 0.1
     # reward scales & Change Logic
     distance_threshold = 0.2
-    lin_vel_reward_scale = -0.5
+    lin_vel_reward_scale = -0.3
     ang_vel_reward_scale = -0.1
-    distance_to_goal_reward_scale = 20.0
-    # Max Action Scale
+    distance_to_goal_reward_scale = 40.0
+    # Max Action Scale -> Scheduling이 필요할수도 ?
     max_lin_vel_x = 0.5
     max_lin_vel_y = 0.5
     max_lin_vel_z = 0.2
@@ -311,7 +311,7 @@ class CentralTELLOEnv(DirectRLEnv):
         self._actions[env_ids] = 0.0
         self._center_vel = torch.zeros(self.num_envs, 6, device=self.device)
         # Sample new commands
-        self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
+        self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-1.5, 1.5)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
         self._desired_pos_w[env_ids, 2]  = torch.zeros_like(self._desired_pos_w[env_ids, 2]).uniform_(0.5, 1.0)
         self.prev_distance = torch.linalg.norm(self._desired_pos_w - self._robot.data.root_pos_w, dim=1)
@@ -408,7 +408,7 @@ class CentralTELLOEnv(DirectRLEnv):
 
 
 torch.jit.script
-def Low_Pass_Filter(current_value, target_value, omega=1/0.05, dt=0.01):
+def Low_Pass_Filter(current_value, target_value, omega=1/0.01, dt=0.01):
     coeff = 1/(1 + omega * dt)
     return coeff * (current_value + omega * dt * target_value)
 
