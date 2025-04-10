@@ -16,12 +16,13 @@ from isaaclab.envs import DirectMARLEnv
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, quat_error_magnitude
-
 from .multi_tello_payload_env_cfg import MultiTelloPayloadEnvCfg
+import numpy as np
 
 
 class MultiTelloPayloadEnv(DirectMARLEnv):
     cfg: MultiTelloPayloadEnvCfg
+
 
     def __init__(self, cfg: MultiTelloPayloadEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
@@ -59,11 +60,11 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         
 
     def _setup_scene(self):
-        # add left, right quadrotor and goal object
+        # add left, right quadrotor and goal object finally assemble them
         self.left = Articulation(self.cfg.left_robot_cfg)
         self.right = Articulation(self.cfg.right_robot_cfg)
-        # self.object = RigidObject(self.cfg.object_cfg)
-        
+        self.object = RigidObject(self.cfg.object_cfg)
+
         # add ground plane & terrain
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
         self.cfg.terrain.num_envs = self.scene.cfg.num_envs
@@ -84,46 +85,46 @@ class MultiTelloPayloadEnv(DirectMARLEnv):
         self.actions = actions
 
         # Left quadrotor velocity
-        self.left_actions[:, :]  = self.actions["left"].clone()
-        left_lin_vel = torch.linalg.norm(self.left_actions[:, :3], dim=1, keepdim=True) + 1e-7
-        clamp_left_lin_vel = torch.min(torch.ones_like(left_lin_vel), self.cfg.max_lin_vel / left_lin_vel)
-        
-        self.left_actions[:, :3] *= clamp_left_lin_vel
-        self.left_actions[:, 2] += self._gravity_magnitude * self.scene.physics_dt
-        self.left_actions[:, 5] = torch.clamp(self.left_actions[:, 5], -self.cfg.max_ang_vel, self.cfg.max_ang_vel)
-         
+        self.left_actions[:, :]  = self.actions["left"].clone().clamp(-1.0, 1.0)
+        self.left_actions[:, 0] *= self.cfg.max_lin_vel_x
+        self.left_actions[:, 1] *= self.cfg.max_lin_vel_y
+        self.left_actions[:, 2]  = self.left_actions[:, 2] * self.cfg.max_lin_vel_z + self._gravity_magnitude * self.scene.physics_dt
+        self.left_actions[:, 3] *= self.cfg.max_ang_vel_z
         # Right quadrotor velocity
-        self.right_actions[:, :]  = self.actions["right"].clone()
-        right_lin_vel = torch.linalg.norm(self.right_actions[:, :3], dim=1, keepdim=True) + 1e-7
-        clamp_right_lin_vel = torch.min(torch.ones_like(right_lin_vel), self.cfg.max_lin_vel / right_lin_vel)
-        
-        self.right_actions[:, :3] *= clamp_right_lin_vel
-        self.right_actions[:, 2] += self._gravity_magnitude * self.scene.physics_dt
-        self.right_actions[:, 5] = torch.clamp(self.right_actions[:, 5], -self.cfg.max_ang_vel, self.cfg.max_ang_vel)
+        self.right_actions[:, :] = self.actions["right"].clone().clamp(-1.0, 1.0)
+        self.right_actions[:, 0] *= self.cfg.max_lin_vel_x
+        self.right_actions[:, 1] *= self.cfg.max_lin_vel_y
+        self.right_actions[:, 2]  = self.right_actions[:, 2] * self.cfg.max_lin_vel_z + self._gravity_magnitude * self.scene.physics_dt
+        self.right_actions[:, 3] *= self.cfg.max_ang_vel_z
         
 
     def _apply_action(self) -> None:
-        # Assign Actions each Agent & Pre-Processing
-        left_vel = torch.concat((
-            self.left.data.root_lin_vel_w,
-            self.left.data.root_ang_vel_w[:, 2].unsqueeze(-1)
-            ),
-            dim=1
-        )
-        right_vel = torch.concat((
-            self.right.data.root_lin_vel_w,
-            self.right.data.root_ang_vel_w[:, 2].unsqueeze(-1)
-            ),
-            dim=1
-        )
-        left_applied_actions  = Low_Pass_Filter(left_vel, self.left_actions)
-        right_applied_actions = Low_Pass_Filter(right_vel, self.right_actions)
+        # Assign Actions each Agent
+        # left_vel = torch.concat((
+        #     self.left.data.root_lin_vel_w,
+        #     self.left.data.root_ang_vel_w[:, 2].unsqueeze(-1)
+        #     ),
+        #     dim=1
+        # )
+        # right_vel = torch.concat((
+        #     self.right.data.root_lin_vel_w,
+        #     self.right.data.root_ang_vel_w[:, 2].unsqueeze(-1)
+        #     ),
+        #     dim=1
+        # )
+        # left_applied_actions  = Low_Pass_Filter(left_vel, self.left_actions)
+        # right_applied_actions = Low_Pass_Filter(right_vel, self.right_actions)
 
-        self.left_filtered_actions[:, :3] = left_applied_actions[:, :3]
-        self.left_filtered_actions[:, 5] = left_applied_actions[:, 3]
+        # self.left_filtered_actions[:, :3] = left_applied_actions[:, :3]
+        # self.left_filtered_actions[:, 5] = left_applied_actions[:, 3]
 
-        self.right_filtered_actions[:, :3] = right_applied_actions[:, :3]
-        self.right_filtered_actions[:, 5] = right_applied_actions[:, 3]
+        # self.right_filtered_actions[:, :3] = right_applied_actions[:, :3]
+        # self.right_filtered_actions[:, 5] = right_applied_actions[:, 3]
+
+        self.left_filtered_actions = torch.zeros([self.num_envs, 6], device=self.device)
+        self.right_filtered_actions = torch.zeros([self.num_envs, 6], device=self.device)
+        self.left_filtered_actions[:, 2] = 1.0
+        self.right_filtered_actions[:, 2] = 1.0
 
         self.left.write_root_velocity_to_sim(self.left_filtered_actions, self.left._ALL_INDICES)
         self.right.write_root_velocity_to_sim(self.right_filtered_actions, self.right._ALL_INDICES)
@@ -344,9 +345,8 @@ def randomize_rotation(rand0, rand1, x_unit_tensor, y_unit_tensor):
     return quat_mul(
         quat_from_angle_axis(rand0 * np.pi, x_unit_tensor), quat_from_angle_axis(rand1 * np.pi, y_unit_tensor)
     )
-    
-    
-@torch.jit.script
+
+
 def Low_Pass_Filter(current_value, target_value, omega=1/0.05, dt=0.01):
     coeff = 1/(1 + omega * dt)
     return coeff * (current_value + omega * dt * target_value)

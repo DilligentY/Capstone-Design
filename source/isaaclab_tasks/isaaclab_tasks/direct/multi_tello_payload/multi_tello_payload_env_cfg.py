@@ -2,7 +2,10 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
-from isaaclab_assets import TELLOAPPROX_CFG
+
+
+from isaaclab_assets.robots.shadow_hand import SHADOW_HAND_CFG
+from isaaclab_assets import TELLOAPPROX_CFG, TELLOPAYLOAD_CFG
 
 
 import isaaclab.envs.mdp as mdp
@@ -151,7 +154,7 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
 
     # robot
     
-    left_robot_cfg    : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_left").replace(
+    left_robot_cfg    : ArticulationCfg = TELLOPAYLOAD_CFG.replace(prim_path="/World/envs/env_.*/Robot").replace(
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0.0, -1.0, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
@@ -159,26 +162,14 @@ class MultiTelloPayloadEnvCfg(DirectMARLEnvCfg):
                 ".*": 0.0,
             },
             joint_vel={
-                "m1_joint": 200.0,
-                "m2_joint": -200.0,
-                "m3_joint": 200.0,
-                "m4_joint": -200.0,
-            },
-        )
-    )
-
-    right_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_right").replace(
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, 1.0, 0.5),
-            rot=(1.0, 0.0, 0.0, 0.0),
-            joint_pos={
-                ".*": 0.0,
-            },
-            joint_vel={
-                "m1_joint": 200.0,
-                "m2_joint": -200.0,
-                "m3_joint": 200.0,
-                "m4_joint": -200.0,
+                "m1_joint_left": 200.0,
+                "m2_joint_left": -200.0,
+                "m3_joint_left": 200.0,
+                "m4_joint_left": -200.0,
+                "m1_joint_right": 200.0,
+                "m2_joint_right": -200.0,
+                "m3_joint_right": 200.0,
+                "m4_joint_right": -200.0,
             },
         )
     )
