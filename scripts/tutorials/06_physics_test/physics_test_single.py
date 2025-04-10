@@ -43,7 +43,7 @@ from isaaclab.sim import SimulationContext
 ##
 # Pre-defined configs
 ##
-from isaaclab_assets import CRAZYFLIE_CFG, CARTPOLE_CFG, TELLOPAYLOAD_CFG  # isort:skip
+from isaaclab_assets import TELLOAPPROX_CFG, TELLOPAYLOAD_CFG  # isort:skip
 
 
 def design_scene() -> tuple[dict, list[list[float]]]:
@@ -63,7 +63,7 @@ def design_scene() -> tuple[dict, list[list[float]]]:
     prim_utils.create_prim("/World/Origin2", "Xform", translation=origins[1])
     # Each group will have a robot in it
     # Articulation
-    quadrotor_cfg = CRAZYFLIE_CFG.copy()
+    quadrotor_cfg = TELLOAPPROX_CFG.copy()
     quadrotor_cfg.prim_path = "/World/Origin.*/Robot"
     tello = Articulation(cfg=quadrotor_cfg)
 
@@ -80,24 +80,17 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
     robot = entities["tello"]
     env_id = robot._ALL_INDICES
     num_env = len(env_id)
-    # cube_body = robot.find_bodies("cube")[0]
-    # left_body = robot.find_bodies("body_left")[0]
-    # right_body = robot.find_bodies("body_right")[0]
     tello_body = robot.find_bodies("body")[0]
-    _thrust_left = torch.zeros(num_env, 1, 3, device=robot.device)
-    _thrust_right = torch.zeros(num_env, 1, 3, device=robot.device)
+    _thrust = torch.zeros(num_env, 1, 3, device=robot.device)
     _torque = torch.zeros(num_env, 1, 3, device=robot.device)
-    _root_vel = torch.zeros(num_env, 1, 6, device=robot.device)
-    _root_vel[:, :, 5] = 2.0
     # Define simulation stepping
     sim_dt = sim.get_physics_dt()
     count = 0
-    
 
     # Simulation loop
     while simulation_app.is_running():
         # Reset
-        if count % 3000 == 0:
+        if count % 1000 == 0:
             # reset counter
             count = 0
             # reset the scene entities
@@ -116,43 +109,27 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             print("[INFO]: Resetting robot state...")
 
         # Apply random action
-        # -- generate random Action
-        efforts = torch.randn_like(robot.data.joint_pos) * 2.0
-        _thrust_left[:, :, 2] = (2.0 * (2.0 - robot.data.root_state_w[:, 2])).clamp(0.0, 10.0).view(num_env, 1)
-        _thrust_right[:, :, 2] = (2.0 * (2.0 - robot.data.root_state_w[:, 2])).clamp(0.0, 10.0).view(num_env, 1)
-        _torque[:, :, 1] = 0.67
+        # -- generate random joint efforts
+        efforts = torch.randn_like(robot.data.joint_pos) * 0.0
+        _thrust[:, :, 2] = (1.0 * (1.0 - robot.data.root_state_w[:, 2])).clamp(0.0, 10.0).view(num_env, 1)
+        # _torque[:, :, 1] = 0.67
         _torque[:, :, 2] = 1.05
-        _random_vel = torch.zeros(num_env, 1, 6, device=robot.device).uniform_(-1.0, 1.0)
 
-        # Calculate Kinematics Velocity for mapping
-        v_com = robot.data.body_state_w[0, cube_body, 7:10]
-        pos_err_w_left = robot.data.body_state_w[0, left_body, :3] - robot.data.body_state_w[0, cube_body, :3]
-        pos_err_w_right = robot.data.body_state_w[0, right_body, :3] - robot.data.body_state_w[0, cube_body, :3]
-        ang_vel_term_left = torch.cross(robot.data.body_state_w[0, cube_body, 10:].squeeze(-1), pos_err_w_left.squeeze(-1))
-        ang_vel_term_right = torch.cross(robot.data.body_state_w[0, cube_body, 10:].squeeze(-1), pos_err_w_right.squeeze(-1))
 
-        v_left = v_com + ang_vel_term_left
-        v_right = v_com + ang_vel_term_right
-        print(f"Random Control Input is applied")
-        # print("-------------------------------------------------------------------")
         # print(f"Cube_att : {robot.data.body_state_w[0, cube_body, 3:7].tolist()}")
         # print(f"Left_att : {robot.data.body_state_w[0, left_body, 3:7].tolist()}")
         # print(f"Right_att : {robot.data.body_state_w[0, right_body, 3:7].tolist()}")
-        # print("-------------------------------------------------------------------")
 
-        print("-------------------------------------------------------------------")
-        print(f"Cube_vel : {robot.data.body_state_w[0, cube_body, 7:].tolist()}")
-        print(f"Left_vel_cal : {v_left.tolist()}")
-        print(f"Left_vel : {robot.data.body_state_w[0, left_body, 7:].tolist()}")
-        print(f"Right_vel : {robot.data.body_state_w[0, right_body, 7:].tolist()}")
-        print(f"Right_vel_cal : {v_right.tolist()} ")
-        print("-------------------------------------------------------------------")
+        # print(f"Root_vel : {robot.data.root_lin_vel_w[0, :].tolist()}")
+        # print(f"Cube_vel : {robot.data.body_state_w[0, cube_body, 7:].tolist()}")
+        # print(f"Left_vel : {robot.data.body_state_w[0, left_body, 7:].tolist()}")
+        # print(f"Right_vel : {robot.data.body_state_w[0, right_body, 7:].tolist()}")
+
+        print(f"Joint vel : {robot.data.joint_vel}")
 
         # -- apply action to the robot
         # robot.set_joint_effort_target(efforts)
-        # robot.set_external_force_and_torque(_thrust_left, _torque, body_ids=left_body, env_ids=env_id)
-        # robot.set_external_force_and_torque(_thrust_right, _torque, body_ids=right_body, env_ids=env_id)
-        robot.write_root_com_velocity_to_sim(_random_vel.squeeze(1), env_ids=env_id)
+        robot.set_external_force_and_torque(_thrust, _torque, body_ids=tello_body, env_ids=env_id)
         # -- write data to sim
         robot.write_data_to_sim()
         # Perform step

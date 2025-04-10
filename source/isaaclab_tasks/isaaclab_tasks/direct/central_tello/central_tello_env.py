@@ -52,9 +52,9 @@ class TELLOEnvWindow(BaseEnvWindow):
 @configclass
 class CentralTELLOEnvCfg(DirectRLEnvCfg):
     # env information
-    episode_length_s = 10.0
+    episode_length_s = 20.0
     decimation = 2
-    action_space = 8
+    action_space = 4
     observation_space = 20
     state_space = 0
     debug_vis = True
@@ -149,6 +149,7 @@ class CentralTELLOEnv(DirectRLEnv):
         self._left_torque = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self._right_thrust = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self._right_torque = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self._center_vel = torch.zeros(self.num_envs, 6, device=self.device)
         # Goal position
         self._desired_pos_w_list = None
         self._desired_pos_w = torch.zeros(self.num_envs, 3, device=self.device)
@@ -188,14 +189,28 @@ class CentralTELLOEnv(DirectRLEnv):
 
     def _pre_physics_step(self, actions: torch.Tensor):
         self._actions = actions.clone().clamp(-1.0, 1.0)
-        self._left_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self._actions[:, 0] + 1.0) / 2.0
-        self._left_torque[:, 0, :] = self.cfg.torque_scale * self._actions[:, 1:4]
-        self._right_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self._actions[:, 4] + 1.0) / 2.0
-        self._right_torque[:, 0, :] = self.cfg.torque_scale * self._actions[:, 5:]
+        self._actions[:, 0] *= self.cfg.max_lin_vel_x
+        self._actions[:, 1] *= self.cfg.max_lin_vel_y
+        self._actions[:, 2] *= self.cfg.max_lin_vel_z
+        self._actions[:, 3] *= self.cfg.max_ang_vel_z
+        # self._left_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self._actions[:, 0] + 1.0) / 2.0
+        # self._left_torque[:, 0, :] = self.cfg.torque_scale * self._actions[:, 1:4]
+        # self._right_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self._actions[:, 4] + 1.0) / 2.0
+        # self._right_torque[:, 0, :] = self.cfg.torque_scale * self._actions[:, 5:]
 
     def _apply_action(self):
-        self._robot.set_external_force_and_torque(self._left_thrust, self._left_torque, body_ids=self._left_body_id)
-        self._robot.set_external_force_and_torque(self._right_thrust, self._right_torque, body_ids=self._right_body_id)
+        current_vel = torch.hstack(
+            (
+                self._robot.data.root_lin_vel_w,
+                self._robot.data.root_ang_vel_w[:, 2].unsqueeze(-1)
+            )
+        )
+        _center_vel = Low_Pass_Filter(current_vel, self._actions)
+        self._center_vel[:, :3] = _center_vel[:, :3]
+        self._center_vel[:, 5] = _center_vel[:, 3]
+        self._robot.write_root_velocity_to_sim(self._center_vel)
+        # self._robot.set_external_force_and_torque(self._left_thrust, self._left_torque, body_ids=self._left_body_id)
+        # self._robot.set_external_force_and_torque(self._right_thrust, self._right_torque, body_ids=self._right_body_id)
 
     def _get_observations(self) -> dict:
         """
@@ -209,8 +224,7 @@ class CentralTELLOEnv(DirectRLEnv):
         # cube_state = self._robot.data.body_state_w[:, self._cube_body_id, :]
         # left_state = self._robot.data.body_state_w[:, self._left_body_id, :]
         # right_state = self._robot.data.body_state_w[:, self._right_body_id, :]
-
-        altitude_robot = self._robot.data.root_state_w[:, 2]
+        altitude_root = self._robot.data.root_state_w[:, 2]
         desired_pos_b, _ = subtract_frame_transforms(
             self._robot.data.root_state_w[:, :3], self._robot.data.root_state_w[:, 3:7], self._desired_pos_w
         )
@@ -218,13 +232,13 @@ class CentralTELLOEnv(DirectRLEnv):
         obs = torch.cat(
             [
                 # 속도, 자세, 고도, 포지션 에러
-                self._robot.data.root_lin_vel_b, # (3)
-                self._robot.data.root_ang_vel_b, # (3)
+                self._robot.data.root_lin_vel_w, # (3)
+                self._robot.data.root_ang_vel_w, # (3)
                 self._robot.data.root_quat_w,    # (4)
                 self._robot.data.body_lin_vel_w[:, self._left_body_id, :].squeeze(1), # (3)
                 self._robot.data.body_lin_vel_w[:, self._right_body_id, :].squeeze(1), # (3)
                 desired_pos_b, # (3)
-                altitude_robot.unsqueeze(-1), # (1)
+                altitude_root.unsqueeze(-1), # (1)
             ],
             dim=-1
         )
@@ -271,7 +285,6 @@ class CentralTELLOEnv(DirectRLEnv):
     def _reset_idx(self, env_ids: torch.Tensor | None):
         if env_ids is None or len(env_ids) == self.num_envs:
             env_ids = self._robot._ALL_INDICES
-
         # Logging
         final_distance_to_goal = torch.linalg.norm(
             self._desired_pos_w[env_ids] - self._robot.data.root_pos_w[env_ids], dim=1
@@ -283,20 +296,20 @@ class CentralTELLOEnv(DirectRLEnv):
             self._episode_sums[key][env_ids] = 0.0
         self.extras["log"] = dict()
         self.extras["log"].update(extras)
-
         extras = dict()
         extras["Episode_Termination/died"] = torch.count_nonzero(self.reset_terminated[env_ids]).item()
         extras["Episode_Termination/time_out"] = torch.count_nonzero(self.reset_time_outs[env_ids]).item()
         extras["Metrics/final_distance_to_goal"] = final_distance_to_goal.item()
         self.extras["log"].update(extras)
-
+        # Reset simulation
         self._robot.reset(env_ids)
         super()._reset_idx(env_ids)
         if len(env_ids) == self.num_envs:
             # Spread out the resets to avoid spikes in training when many environments reset at a similar time
             self.episode_length_buf = torch.randint_like(self.episode_length_buf, high=int(self.max_episode_length))
-
+        # Reset action
         self._actions[env_ids] = 0.0
+        self._center_vel = torch.zeros(self.num_envs, 6, device=self.device)
         # Sample new commands
         self._desired_pos_w[env_ids, :2] = torch.zeros_like(self._desired_pos_w[env_ids, :2]).uniform_(-2.0, 2.0)
         self._desired_pos_w[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
@@ -392,3 +405,13 @@ class CentralTELLOEnv(DirectRLEnv):
             self.point_ids[next_env_ids] += 1
             self.point_ids[next_env_ids] %= num_points
             self._desired_pos_w[next_env_ids, :] = self._desired_pos_w_list[self.point_ids[next_env_ids].squeeze(-1).long(), :, next_env_ids]
+
+
+torch.jit.script
+def Low_Pass_Filter(current_value, target_value, omega=1/0.05, dt=0.01):
+    coeff = 1/(1 + omega * dt)
+    return coeff * (current_value + omega * dt * target_value)
+
+torch.jit.script
+def mapping_to_link():
+    pass

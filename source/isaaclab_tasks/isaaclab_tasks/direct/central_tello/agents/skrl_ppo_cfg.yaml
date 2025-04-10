@@ -41,7 +41,7 @@ memory:
 # learning_rate_scheduler: KLAdaptiveLR
 agent:
   class: PPO
-  rollouts: 36
+  rollouts: 48
   learning_epochs: 5
   mini_batches: 4
   discount_factor: 0.99
