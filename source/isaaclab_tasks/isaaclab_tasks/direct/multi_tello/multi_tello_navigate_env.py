@@ -16,7 +16,6 @@ from isaaclab.envs import DirectMARLEnv
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, quat_error_magnitude
-
 from .multi_tello_navigate_env_cfg import MultiTelloNavigateEnvCfg
 
 
@@ -26,18 +25,21 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
     def __init__(self, cfg: MultiTelloNavigateEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
    
-        self.leader_actions   = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
-        self.left_actions     = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
-        self.right_actions    = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
+        self.leader_actions  = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
+        self.left_actions    = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
+        self.right_actions   = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
         
-        self.leader_torque    = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
-        self.left_torque      = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
-        self.right_torque     = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
+        self.leader_torque   = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
+        self.left_torque     = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
+        self.right_torque    = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
         
         self.leader_thrust   = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
         self.left_thrust     = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
-        self.right_thrust    = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device) 
+        self.right_thrust    = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device)
 
+        self.leader_vel      = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device) 
+        self.left_vel        = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device) 
+        self.right_vel       = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
 
         # used to compare object position
         # self.in_hand_pos = self.object.data.default_root_state[:, 0:3].clone()
@@ -55,6 +57,10 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.x_unit_tensor = torch.tensor([1, 0, 0], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
         self.y_unit_tensor = torch.tensor([0, 1, 0], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
         self.z_unit_tensor = torch.tensor([0, 0, 1], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
+        self.action_scale = torch.tensor([self.cfg.max_lin_vel_x, 
+                                             self.cfg.max_lin_vel_y,
+                                             self.cfg.max_lin_vel_z,
+                                             self.cfg.max_ang_vel_z], device=self.device).repeat((self.num_envs, 1))
         
         # Body Id for Apply Action
         self._leader_body_id = self.leader.find_bodies("body")[0]
@@ -86,31 +92,61 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.scene.articulations["leader"] = self.leader
         self.scene.articulations["left"] = self.left
         self.scene.articulations["right"] = self.right
+        # self.scene.sensors["leader_cam"]
+        # self.scene.sensors["left_cam"]
+        # self.scene.sensors["right_cam"]
+
         # add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
 
     def _pre_physics_step(self, actions: dict[str, torch.Tensor]) -> None:
         self.actions = actions
-        
-        self.leader_actions[:, :] = self.actions["leader"].clamp(-1.0, 1.0)
-        self.leader_torque[:, 0, :] = self.cfg.torque_scale * self.leader_actions[:, 1:]
-        self.leader_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self.leader_actions[:, 0] + 1.0) / 2.0
-        
-        self.left_actions[:, :] = self.actions["left"].clamp(-1.0, 1.0)
-        self.left_torque[:, 0, :] = self.cfg.torque_scale * self.left_actions[:, 1:]
-        self.left_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self.left_actions[:, 0] + 1.0) / 2.0
-        
-        self.right_actions[:, :] = self.actions["right"].clamp(-1.0, 1.0)
-        self.right_torque[:, 0, :] = self.cfg.torque_scale * self.right_actions[:, 1:]
-        self.right_thrust[:, 0, 2] = self.cfg.thrust_to_weight * self._robot_weight * (self.right_actions[:, 0] + 1.0) / 2.0
+        self.leader_actions[:, :] = self.actions["leader"].clamp(-1.0, 1.0) * self.action_scale
+        self.left_actions[:, :] = self.actions["left"].clamp(-1.0, 1.0) * self.action_scale
+        self.right_actions[:, :] = self.actions["right"].clamp(-1.0, 1.0) * self.action_scale
+
 
 
     def _apply_action(self) -> None:
         # Assign Actions each Agent
-        self.leader.set_external_force_and_torque(self.leader_thrust, self.leader_torque, body_ids=self._leader_body_id)
-        self.left.set_external_force_and_torque(self.left_thrust, self.left_torque, body_ids=self._left_body_id)
-        self.right.set_external_force_and_torque(self.right_thrust, self.right_torque, body_ids=self._right_body_id)
+        current_vel = torch.hstack(
+            (
+                self.leader.data.root_lin_vel_w,
+                self.leader.data.root_ang_vel_w[:, 2].unsqueeze(-1),
+                self.left.data.root_lin_vel_w,
+                self.left.data.root_ang_vel_w[:, 2].unsqueeze(-1),
+                self.right.data.root_lin_vel_w,
+                self.right.data.root_ang_vel_w[:, 2].unsqueeze(-1),
+            )
+        )
+        target_vel = torch.hstack(
+            (
+                self.leader_actions,
+                self.left_actions,
+                self.right_actions
+            )
+        )
+        # Approximate Time Delay System
+        approx_responses = Low_Pass_Filter(current_vel, target_vel)
+        # Assign each agent
+        self.leader_vel[:, :3] = approx_responses[:, :3]
+        self.leader_vel[:, 5] = approx_responses[:, 3] + (self._gravity_magnitude * self.physics_dt)
+        self.left_vel[:, :3] = approx_responses[:, 4:7]
+        self.left_vel[:, 5] = approx_responses[:, 7] + (self._gravity_magnitude * self.physics_dt)
+        self.right_vel[:, :3] = approx_responses[:, 8:11]
+        self.right_vel[:, 5] = approx_responses[:, 11] + (self._gravity_magnitude * self.physics_dt)
+        # print(f"Current Leader Vel : {current_vel[0, :4]}")
+        # print(f"Current Left Vel : {current_vel[0, 4:8]}")
+        # print(f"Current Right Vel : {current_vel[0, 8:12]}")
+        # print(f"Next Leader Input : {self.leader_vel[0, :]}")
+        # print(f"Next Left Input : {self.left_vel[0, :]}")
+        # print(f"Next right Input : {self.right_vel[0, :]}")
+
+        # Insert velocity value
+        self.leader.write_root_velocity_to_sim(self.leader_vel)
+        self.left.write_root_velocity_to_sim(self.left_vel)
+        self.right.write_root_velocity_to_sim(self.right_vel)
 
 
     def _get_observations(self) -> dict[str, torch.Tensor]:
@@ -124,9 +160,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     # Angular Velocity (3)
                     self.leader_ang_vel_b,
                     # Attitude (4)
-                    self.leader_rot,
+                    self.leader_rot_w,
                     # Altitude (1)
-                    self.leader_altitude,
+                    self.leader_altitude_w,
                     # Actions (4)
                     self.actions["leader"],
                     # Position Error (3)
@@ -143,9 +179,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     # Angular Velocity (3)
                     self.left_ang_vel_b,
                     # Attitude (4)
-                    self.left_rot,
+                    self.left_rot_w,
                     # Altitude (1)
-                    self.left_altitude,
+                    self.left_altitude_w,
                     # Actions (4)
                     self.actions["left"],
                     # Position Error (3)
@@ -162,9 +198,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     # Angular Velocity (3)
                     self.right_ang_vel_b,
                     # Attitude (4)
-                    self.right_rot,
+                    self.right_rot_w,
                     # Altitude (1)
-                    self.right_altitude,
+                    self.right_altitude_w,
                     # Actions (4)
                     self.actions["right"],
                     # Position Error (3)
@@ -184,22 +220,22 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                 # ---- Leader Agent (18) ----
                 self.leader_lin_vel_b,
                 self.leader_ang_vel_b,
-                self.leader_rot,
-                self.leader_altitude,
+                self.leader_rot_w,
+                self.leader_altitude_w,
                 self.actions["leader"],
                 self.desired_pos_b,
                 # ---- Left Agent (18) ----
                 self.left_lin_vel_b,
                 self.left_ang_vel_b,
-                self.left_rot,
-                self.left_altitude,
+                self.left_rot_w,
+                self.left_altitude_w,
                 self.actions["left"],
                 self.pos_left_leader_b,
                 # ---- Right Agent (18) ----
                 self.right_lin_vel_b,
                 self.right_ang_vel_b,
-                self.right_rot,
-                self.right_altitude,
+                self.right_rot_w,
+                self.right_altitude_w,
                 self.actions["right"],
                 self.pos_right_leader_b,
             ),
@@ -220,14 +256,14 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         ang_vel_left = torch.sum(torch.square(self.left_ang_vel_b), dim=1)
         distance_to_leader_left = torch.linalg.norm(self.pos_left_leader_b, dim=1)
         distance_to_leader_left_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_left))
-        attitude_to_leader_left = quat_error_magnitude(self.left_rot, self.leader_rot)
+        attitude_to_leader_left = quat_error_magnitude(self.left_rot_w, self.leader_rot_w)
         attitude_to_leader_left_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_left / torch.pi))
         # compute Right Reward
         lin_vel_right = torch.sum(torch.square(self.right_lin_vel_b), dim=1)
         ang_vel_right = torch.sum(torch.square(self.right_ang_vel_b), dim=1)
         distance_to_leader_right = torch.linalg.norm(self.pos_right_leader_b, dim=1)
         distance_to_leader_right_mapped = torch.exp(-torch.abs(self.cfg.distance_threshold - distance_to_leader_right))
-        attitude_to_leader_right = quat_error_magnitude(self.right_rot, self.leader_rot)
+        attitude_to_leader_right = quat_error_magnitude(self.right_rot_w, self.leader_rot_w)
         attitude_to_leader_right_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_right / torch.pi))
 
         # make Reward Dictionary
@@ -304,7 +340,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
             joint_pos = robot.data.default_joint_pos[env_ids]
             joint_vel = robot.data.default_joint_vel[env_ids]
             default_root_state = robot.data.default_root_state[env_ids]
-            pos_noise = sample_uniform(-1.0, 1.0, (len(env_ids), 3), device=self.device)
+            pos_noise = sample_uniform(-0.1, 0.1, (len(env_ids), 3), device=self.device)
             default_root_state[:, :3] += self.cfg.reset_dof_pos_noise * pos_noise + self._terrain.env_origins[env_ids]
             robot.write_root_pose_to_sim(default_root_state[:, :7], env_ids)
             robot.write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
@@ -341,40 +377,40 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
     def _compute_intermediate_values(self):
         # data for leader quadrotor's observation
-        self.leader_pos = self.leader.data.root_state_w[:, :3]
-        self.leader_rot = self.leader.data.root_state_w[:, 3:7]
+        self.leader_pos_w = self.leader.data.root_state_w[:, :3]
+        self.leader_rot_w = self.leader.data.root_state_w[:, 3:7]
         self.leader_lin_vel_b = self.leader.data.root_lin_vel_b
         self.leader_ang_vel_b = self.leader.data.root_ang_vel_b
-        self.leader_altitude = self.leader.data.root_state_w[:, 2].unsqueeze(-1)
-        self.desired_pos_b, _ = subtract_frame_transforms(self.leader_pos, self.leader_rot, self.goal_pos)
+        self.leader_altitude_w = self.leader.data.root_state_w[:, 2].unsqueeze(-1)
+        self.desired_pos_b, _ = subtract_frame_transforms(self.leader_pos_w, self.leader_rot_w, self.goal_pos)
 
         # data for left quadrotor's observation
-        self.left_pos = self.left.data.root_state_w[:, :3]
-        self.left_rot = self.left.data.root_state_w[:, 3:7]
+        self.left_pos_w = self.left.data.root_state_w[:, :3]
+        self.left_rot_w = self.left.data.root_state_w[:, 3:7]
         self.left_lin_vel_b = self.left.data.root_lin_vel_b
         self.left_ang_vel_b = self.left.data.root_ang_vel_b
-        self.left_altitude = self.left.data.root_state_w[:, 2].unsqueeze(-1)
+        self.left_altitude_w = self.left.data.root_state_w[:, 2].unsqueeze(-1)
 
         # data for right quadrotor's observation
-        self.right_pos = self.right.data.root_state_w[:, :3]
-        self.right_rot = self.right.data.root_state_w[:, 3:7]
+        self.right_pos_w = self.right.data.root_state_w[:, :3]
+        self.right_rot_w = self.right.data.root_state_w[:, 3:7]
         self.right_lin_vel_b = self.right.data.root_lin_vel_b
         self.right_ang_vel_b = self.right.data.root_ang_vel_b
-        self.right_altitude = self.right.data.root_state_w[:, 2].unsqueeze(-1)
+        self.right_altitude_w = self.right.data.root_state_w[:, 2].unsqueeze(-1)
 
         # data for quadrotor's States
-        self.dist_leader_left = torch.linalg.norm(self.leader_pos - self.left_pos, dim=-1)
-        self.dist_leader_right = torch.linalg.norm(self.leader_pos - self.right_pos, dim=-1)
-        self.dist_left_right = torch.linalg.norm(self.left_pos - self.right_pos, dim=-1)
+        self.dist_leader_left = torch.linalg.norm(self.leader_pos_w - self.left_pos_w, dim=-1)
+        self.dist_leader_right = torch.linalg.norm(self.leader_pos_w - self.right_pos_w, dim=-1)
+        self.dist_left_right = torch.linalg.norm(self.left_pos_w - self.right_pos_w, dim=-1)
 
         # data for Done & Reward calculation
         self.d = torch.cat((self.dist_leader_left, self.dist_leader_right, self.dist_left_right), dim=-1)
-        self.h = torch.cat((self.leader_altitude, self.left_altitude, self.right_altitude), dim=-1)
+        self.h = torch.cat((self.leader_altitude_w, self.left_altitude_w, self.right_altitude_w), dim=-1)
 
-        self.pos_left_leader_b, _ = subtract_frame_transforms(self.leader_pos, self.leader_rot, 
-                                                                self.left_pos, self.left_rot)
-        self.pos_right_leader_b, _ = subtract_frame_transforms(self.leader_pos, self.leader_rot,
-                                                                self.right_pos, self.right_rot)
+        self.pos_left_leader_b, _ = subtract_frame_transforms(self.leader_pos_w, self.leader_rot_w, 
+                                                                self.left_pos_w, self.left_rot_w)
+        self.pos_right_leader_b, _ = subtract_frame_transforms(self.leader_pos_w, self.leader_rot_w,
+                                                                self.right_pos_w, self.right_rot_w)
 
     
 
@@ -393,3 +429,8 @@ def randomize_rotation(rand0, rand1, x_unit_tensor, y_unit_tensor):
     return quat_mul(
         quat_from_angle_axis(rand0 * np.pi, x_unit_tensor), quat_from_angle_axis(rand1 * np.pi, y_unit_tensor)
     )
+
+torch.jit.script
+def Low_Pass_Filter(current_value, target_value, omega=1/0.01, dt=0.01):
+    coeff = 1/(1 + omega * dt)
+    return coeff * (current_value + omega * dt * target_value)

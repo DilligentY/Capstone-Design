@@ -120,10 +120,10 @@ class CentralTELLOEnvCfg(DirectRLEnvCfg):
     ang_vel_reward_scale = -0.1
     distance_to_goal_reward_scale = 40.0
     # Max Action Scale -> Scheduling이 필요할수도 ?
-    max_lin_vel_x = 0.5
-    max_lin_vel_y = 0.5
-    max_lin_vel_z = 0.2
-    max_ang_vel_z = 0.2
+    max_lin_vel_x = 1.0
+    max_lin_vel_y = 1.0
+    max_lin_vel_z = 0.5
+    max_ang_vel_z = 0.5
 
     # Noise Model for Domain Randomization
     action_noise_model: NoiseModelWithAdditiveBiasCfg = NoiseModelWithAdditiveBiasCfg(

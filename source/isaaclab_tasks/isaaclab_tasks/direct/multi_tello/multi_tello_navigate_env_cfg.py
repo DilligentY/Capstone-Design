@@ -20,101 +20,8 @@ from isaaclab.sim import PhysxCfg, SimulationCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.sim.spawners.materials.physics_materials_cfg import RigidBodyMaterialCfg
 from isaaclab.utils.noise import NoiseModelWithAdditiveBiasCfg, GaussianNoiseCfg
+from isaaclab.sensors import CameraCfg
 from isaaclab.utils import configclass
-
-
-# @configclass
-# class EventCfg:
-#     """Configuration for randomization."""
-
-#     # -- robot
-#     robot_physics_material = EventTerm(
-#         func=mdp.randomize_rigid_body_material,
-#         mode="reset",
-#         min_step_count_between_reset=720,
-#         params={
-#             "asset_cfg": SceneEntityCfg("right_hand"),
-#             "static_friction_range": (0.7, 1.3),
-#             "dynamic_friction_range": (1.0, 1.0),
-#             "restitution_range": (1.0, 1.0),
-#             "num_buckets": 250,
-#         },
-#     )
-#     robot_joint_stiffness_and_damping = EventTerm(
-#         func=mdp.randomize_actuator_gains,
-#         min_step_count_between_reset=720,
-#         mode="reset",
-#         params={
-#             "asset_cfg": SceneEntityCfg("right_hand", joint_names=".*"),
-#             "stiffness_distribution_params": (0.75, 1.5),
-#             "damping_distribution_params": (0.3, 3.0),
-#             "operation": "scale",
-#             "distribution": "log_uniform",
-#         },
-#     )
-#     robot_joint_pos_limits = EventTerm(
-#         func=mdp.randomize_joint_parameters,
-#         min_step_count_between_reset=720,
-#         mode="reset",
-#         params={
-#             "asset_cfg": SceneEntityCfg("right_hand", joint_names=".*"),
-#             "lower_limit_distribution_params": (0.00, 0.01),
-#             "upper_limit_distribution_params": (0.00, 0.01),
-#             "operation": "add",
-#             "distribution": "gaussian",
-#         },
-#     )
-#     robot_tendon_properties = EventTerm(
-#         func=mdp.randomize_fixed_tendon_parameters,
-#         min_step_count_between_reset=720,
-#         mode="reset",
-#         params={
-#             "asset_cfg": SceneEntityCfg("right_hand", fixed_tendon_names=".*"),
-#             "stiffness_distribution_params": (0.75, 1.5),
-#             "damping_distribution_params": (0.3, 3.0),
-#             "operation": "scale",
-#             "distribution": "log_uniform",
-#         },
-#     )
-
-#     # -- object
-#     object_physics_material = EventTerm(
-#         func=mdp.randomize_rigid_body_material,
-#         min_step_count_between_reset=720,
-#         mode="reset",
-#         params={
-#             "asset_cfg": SceneEntityCfg("object"),
-#             "static_friction_range": (0.7, 1.3),
-#             "dynamic_friction_range": (1.0, 1.0),
-#             "restitution_range": (1.0, 1.0),
-#             "num_buckets": 250,
-#         },
-#     )
-#     object_scale_mass = EventTerm(
-#         func=mdp.randomize_rigid_body_mass,
-#         min_step_count_between_reset=720,
-#         mode="reset",
-#         params={
-#             "asset_cfg": SceneEntityCfg("object"),
-#             "mass_distribution_params": (0.5, 1.5),
-#             "operation": "scale",
-#             "distribution": "uniform",
-#         },
-#     )
-
-#     # -- scene
-#     reset_gravity = EventTerm(
-#         func=mdp.randomize_physics_scene_gravity,
-#         mode="interval",
-#         is_global_time=True,
-#         interval_range_s=(36.0, 36.0),  # time_s = num_steps * (decimation * dt)
-#         params={
-#             "gravity_distribution_params": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.4]),
-#             "operation": "add",
-#             "distribution": "gaussian",
-#         },
-#     )
-
 
 @configclass
 class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
@@ -152,39 +59,58 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
         debug_vis=False,
     )
 
-    # robot
+    # Robot
     leader_robot_cfg  : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Leader")
     
     left_robot_cfg    : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_left").replace(
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, -1.5, 0.5),
+            pos=(-0.5, -0.5, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
-            joint_pos={
-                ".*": 0.0,
-            },
-            joint_vel={
-                "m1_joint": 200.0,
-                "m2_joint": -200.0,
-                "m3_joint": 200.0,
-                "m4_joint": -200.0,
-            },
         )
     )
 
     right_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_right").replace(
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, 1.5, 0.5),
+            pos=(0.5, 0.5, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
-            joint_pos={
-                ".*": 0.0,
-            },
-            joint_vel={
-                "m1_joint": 200.0,
-                "m2_joint": -200.0,
-                "m3_joint": 200.0,
-                "m4_joint": -200.0,
-            },
         )
+    )
+
+    # Camera Sensor
+    leader_camera = CameraCfg(
+        prim_path=f"{leader_robot_cfg.prim_path}/leader_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb", "distance_to_image_plane"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+    )
+
+    left_camera = CameraCfg(
+        prim_path=f"{left_robot_cfg.prim_path}/left_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb", "distance_to_image_plane"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+    )
+
+    right_camera = CameraCfg(
+        prim_path=f"{right_robot_cfg.prim_path}/right_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb", "distance_to_image_plane"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
     )
     
 
@@ -241,6 +167,11 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     attitude_to_follower_reward_scale_2 = 5.0
     # reward-relaed parameters
     distance_threshold = 1.5
+    # Max Action Scale
+    max_lin_vel_x = 1.0
+    max_lin_vel_y = 1.0
+    max_lin_vel_z = 0.5
+    max_ang_vel_z = 0.5
 
 
     # Action Noise Model for Domain Randomization
