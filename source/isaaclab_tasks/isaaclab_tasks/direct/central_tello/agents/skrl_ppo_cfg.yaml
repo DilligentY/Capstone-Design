@@ -41,7 +41,7 @@ memory:
 # learning_rate_scheduler: KLAdaptiveLR
 agent:
   class: PPO
-  rollouts: 48
+  rollouts: 96
   learning_epochs: 5
   mini_batches: 4
   discount_factor: 0.99
@@ -78,5 +78,5 @@ agent:
 # timesteps = Total Time Step
 trainer:
   class: SequentialTrainer
-  timesteps: 4800
+  timesteps: 28800
   environment_info: log
