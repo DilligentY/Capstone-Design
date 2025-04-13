@@ -35,7 +35,7 @@ simulation_app = app_launcher.app
 import torch
 import isaacsim.core.utils.prims as prim_utils
 import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation
+from isaaclab.assets import Articulation, RigidObject, RigidObjectCfg
 from isaaclab.sim import SimulationContext
 from isaaclab_assets import TELLOAPPROX_CFG, TELLOPAYLOAD_CFG  # isort:skip
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
@@ -59,19 +59,42 @@ class SensorsSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # sensors
-    camera = CameraCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/body/front_cam",
-        update_period=0.1,
-        height=480,
-        width=640,
-        data_types=["rgb"],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+    # camera = CameraCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/body/front_cam",
+    #     update_period=0.1,
+    #     height=480,
+    #     width=640,
+    #     data_types=["rgb"],
+    #     spawn=sim_utils.PinholeCameraCfg(
+    #         focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+    #     ),
+    #     offset=CameraCfg.OffsetCfg(pos=(0.0, 0.0, 0.0), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+    #     colorize_instance_id_segmentation=False,
+    #     colorize_instance_segmentation=False,
+    #     colorize_semantic_segmentation=False,
+    # )
+
+    # object
+    object_cfg: RigidObjectCfg = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/object",
+        spawn=sim_utils.SphereCfg(
+            radius=0.3,
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8, 1.0, 0.0)),
+            physics_material=sim_utils.RigidBodyMaterialCfg(static_friction=0.7),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                kinematic_enabled=False,
+                disable_gravity=False,
+                enable_gyroscopic_forces=True,
+                solver_position_iteration_count=4,
+                solver_velocity_iteration_count=4,
+                sleep_threshold=0.005,
+                stabilization_threshold=0.0025,
+                max_depenetration_velocity=1000.0,
+            ),
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            mass_props=sim_utils.MassPropertiesCfg(density=500.0),
         ),
-        offset=CameraCfg.OffsetCfg(pos=(0.0, 0.0, 0.0), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
-        colorize_instance_id_segmentation=False,
-        colorize_instance_segmentation=False,
-        colorize_semantic_segmentation=False,
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(2.0, 0.0, 0.5), rot=(1.0, 0.0, 0.0, 0.0)),
     )
 
 def run_simulator(sim: sim_utils.SimulationContext, scene : InteractiveScene):
@@ -80,7 +103,8 @@ def run_simulator(sim: sim_utils.SimulationContext, scene : InteractiveScene):
     # note: we only do this here for readability. In general, it is better to access the entities directly from
     #   the dictionary. This dictionary is replaced by the InteractiveScene class in the next tutorial.
     robot = scene["robot"]
-    sensor = scene["camera"]
+    # sensor = scene["camera"]
+    object = scene["object"]
     env_id = robot._ALL_INDICES
     num_env = len(env_id)
     tello_body = robot.find_bodies("body")[0]
@@ -120,6 +144,8 @@ def run_simulator(sim: sim_utils.SimulationContext, scene : InteractiveScene):
         robot.set_external_force_and_torque(_thrust, _torque, body_ids=tello_body, env_ids=env_id)
         # -- write data to sim
         robot.write_data_to_sim()
+        
+        object
         # Perform step
         sim.step()
         # Increment counter
@@ -127,10 +153,10 @@ def run_simulator(sim: sim_utils.SimulationContext, scene : InteractiveScene):
         # Update buffers
         scene.update(sim_dt)
         # print information from the sensors
-        print("-------------------------------")
-        print(scene["camera"])
-        print("Received shape of rgb   image: ", sensor.data.output["rgb"].shape)
-        print("-------------------------------")
+        # print("-------------------------------")
+        # print(scene["camera"])
+        # print("Received shape of rgb   image: ", sensor.data.output["rgb"].shape)
+        # print("-------------------------------")
 
 
 def main():

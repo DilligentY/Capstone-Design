@@ -16,13 +16,13 @@ from isaaclab.envs import DirectMARLEnv
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, quat_error_magnitude
-from .multi_tello_navigate_env_cfg import MultiTelloNavigateEnvCfg
+from .multi_tello_CA_env_cfg import MultiTelloCollisionAvoidanceEnvCfg
 
 
-class MultiTelloNavigateEnv(DirectMARLEnv):
-    cfg: MultiTelloNavigateEnvCfg
+class MultiTelloCollisionAvoidanceEnv(DirectMARLEnv):
+    cfg: MultiTelloCollisionAvoidanceEnvCfg
 
-    def __init__(self, cfg: MultiTelloNavigateEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: MultiTelloCollisionAvoidanceEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
    
         self.leader_actions  = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
@@ -72,6 +72,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.leader = Articulation(self.cfg.leader_robot_cfg)
         self.left = Articulation(self.cfg.left_robot_cfg)
         self.right = Articulation(self.cfg.right_robot_cfg)
+        self.object = RigidObject(self.cfg.object_cfg)
         
         # add ground plane & terrain
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
@@ -86,6 +87,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.scene.articulations["leader"] = self.leader
         self.scene.articulations["left"] = self.left
         self.scene.articulations["right"] = self.right
+        self.scene.rigid_objects["object"] = self.object
         # self.scene.sensors["leader_camera"] = self.scene["leader_camera"]
         # self.scene.sensors["left_camera"] = self.scene["left_camera"]
         # self.scene.sensors["right_camera"] = self.scene["right_camera"]
@@ -99,6 +101,8 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.leader_actions[:, :] = self.actions["leader"].clamp(-1.0, 1.0) * self.action_scale
         self.left_actions[:, :] = self.actions["left"].clamp(-1.0, 1.0) * self.action_scale
         self.right_actions[:, :] = self.actions["right"].clamp(-1.0, 1.0) * self.action_scale
+
+
 
     def _apply_action(self) -> None:
         # Assign Actions each Agent
@@ -146,7 +150,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         observations = {
             'leader' : torch.cat(
                 (
-                    # ---- Leader (14) ----
+                    # ---- Leader (21) ----
                     # Linear Velocity (3)
                     self.leader_lin_vel_b,
                     # Angular Velocity (3)
@@ -155,6 +159,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     self.leader_rot_w,
                     # Altitude (1)
                     self.leader_altitude_w,
+                    # Object Position & Rotation (7)
+                    self.object_pos_w,
+                    self.object_rot_w,
                     # Position Error (3)
                     self.desired_pos_b
                 ),
@@ -163,7 +170,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
             'left' : torch.cat(
                 (
-                    # ---- Left Agent (21) ----
+                    # ---- Left Agent (28) ----
                     # Linear Velocity (3)
                     self.left_lin_vel_b,
                     # Angular Velocity (3)
@@ -175,6 +182,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     # Leader to Left (7),
                     self.leader_to_left_pos,
                     self.leader_to_left_rot,
+                    # Object Position & Rotation (7)
+                    self.object_pos_w,
+                    self.object_rot_w,
                     # Position Error (3)
                     self.desired_pos_b_left
                 ),
@@ -183,7 +193,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
             'right' : torch.cat(
                 (
-                    # ---- Right Agent (21) ----
+                    # ---- Right Agent (28) ----
                     # Linear Velocity (3)
                     self.right_lin_vel_b,
                     # Angular Velocity (3)
@@ -195,6 +205,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                     # Leader to Right (7)
                     self.leader_to_right_pos,
                     self.leader_to_right_rot,
+                    # Object Position & Rotation (7)
+                    self.object_pos_w,
+                    self.object_rot_w,
                     # Position Error (3)
                     self.desired_pos_b_right
                 ),
@@ -215,7 +228,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                 self.leader_rot_w,
                 self.leader_altitude_w,
                 self.desired_pos_b,
-                # ---- Left Agent (21) ----
+                # ---- Left Agent (24) ----
                 self.left_lin_vel_b, 
                 self.left_ang_vel_b, 
                 self.left_rot_w, 
@@ -223,7 +236,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                 self.leader_to_left_pos,
                 self.leader_to_left_rot,
                 self.desired_pos_b_left,
-                # ---- Right Agent (21) ----
+                # ---- Right Agent (24) ----
                 self.right_lin_vel_b,
                 self.right_ang_vel_b,
                 self.right_rot_w,
@@ -231,6 +244,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                 self.leader_to_right_pos,
                 self.leader_to_right_rot,
                 self.desired_pos_b_right,
+                # ---- Object (7) ----
+                self.object_pos_w,
+                self.object_rot_w, 
             ),
             dim=-1,
         )
@@ -396,6 +412,10 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # data for quadrotor's States
         self.dist_leader_left = torch.linalg.norm(self.leader_pos_w - self.left_pos_w, dim=-1)
         self.dist_leader_right = torch.linalg.norm(self.leader_pos_w - self.right_pos_w, dim=-1)
+        
+        # data for object
+        self.object_pos_w = self.object.data.root_state_w[:, :3]
+        self.object_rot_w = self.object.data.root_state_w[:, 3:7]
 
         # data for Done & Reward calculation
         self.d = torch.cat((self.leader_to_left_pos, self.leader_to_right_pos), dim=-1)

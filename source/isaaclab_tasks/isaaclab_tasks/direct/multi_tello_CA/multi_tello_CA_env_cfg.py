@@ -24,14 +24,14 @@ from isaaclab.sensors import CameraCfg
 from isaaclab.utils import configclass
 
 @configclass
-class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
+class MultiTelloCollisionAvoidanceEnvCfg(DirectMARLEnvCfg):
     # env
     decimation = 2
     episode_length_s = 10.0
     possible_agents = ["leader", "left", "right"]
     action_spaces = {"leader" : 4, "left" : 4, "right" : 4}
-    observation_spaces = {"leader" : 14, "left" : 21, "right" : 21}
-    state_space = 56
+    observation_spaces = {"leader" : 21, "left" : 28, "right" : 28}
+    state_space = 69
 
     # simulation
     sim: SimulationCfg = SimulationCfg(
@@ -114,6 +114,28 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     # )
     
     
+    object_cfg: RigidObjectCfg = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/object",
+        spawn=sim_utils.SphereCfg(
+            radius=0.3,
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8, 1.0, 0.0)),
+            physics_material=sim_utils.RigidBodyMaterialCfg(static_friction=0.7),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                kinematic_enabled=False,
+                disable_gravity=False,
+                enable_gyroscopic_forces=True,
+                solver_position_iteration_count=4,
+                solver_velocity_iteration_count=4,
+                sleep_threshold=0.005,
+                stabilization_threshold=0.0025,
+                max_depenetration_velocity=1000.0,
+            ),
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            mass_props=sim_utils.MassPropertiesCfg(density=500.0),
+        ),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(2.0, 0.0, 0.5), rot=(1.0, 0.0, 0.0, 0.0)),
+    )
+    
     # goal object
     goal_object_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
         prim_path="/Visuals/goal_marker",
@@ -125,7 +147,7 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
         },
     )
     # scene
-    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=4096, env_spacing=2.5, replicate_physics=True)
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=2048, env_spacing=5.0, replicate_physics=True)
 
     # reset
     reset_position_noise = 0.1  # range of position at reset
@@ -138,7 +160,7 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     lin_vel_reward_scale = -0.5
     ang_vel_reward_scale = -0.1
     distance_to_goal_reward_scale = 20.0
-    distance_to_follower_reward_scale = 10.0
+    distance_to_follower_reward_scale = -15.0
     # reward-related parameters
     distance_threshold = 1.5
     # Max Action Scale
