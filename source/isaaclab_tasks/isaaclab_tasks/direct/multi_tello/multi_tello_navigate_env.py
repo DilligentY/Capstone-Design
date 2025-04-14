@@ -100,6 +100,10 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.left_actions[:, :] = self.actions["left"].clamp(-1.0, 1.0) * self.action_scale
         self.right_actions[:, :] = self.actions["right"].clamp(-1.0, 1.0) * self.action_scale
 
+        for key, value in self.actions.items():
+            if torch.isnan(value).any():
+                ValueError(f"NaN detected in '{key}'")
+
     def _apply_action(self) -> None:
         # Assign Actions each Agent
         current_vel = torch.hstack(
@@ -139,6 +143,14 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.leader.write_root_velocity_to_sim(self.leader_vel)
         self.left.write_root_velocity_to_sim(self.left_vel)
         self.right.write_root_velocity_to_sim(self.right_vel)
+
+        
+        if torch.isnan(self.leader_vel).any():
+            raise ValueError(f"NaN detected in 'leader'")
+        if torch.isnan(self.left_vel).any():
+            raise ValueError(f"NaN detected in 'left'")
+        if torch.isnan(self.right_vel).any():
+            raise ValueError(f"NaN detected in 'right'")
 
 
     def _get_observations(self) -> dict[str, torch.Tensor]:
@@ -201,6 +213,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
                 dim=-1
             ),
         }
+        for agent_name, obs_tensor in observations.items():
+            if torch.isnan(obs_tensor).any():
+                raise ValueError(f"NaN detected in '{agent_name}' observation: {obs_tensor}")
 
         return observations
 
@@ -234,6 +249,8 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
             ),
             dim=-1,
         )
+        if torch.isnan(states).any():
+            raise ValueError(f"NaN detected in state")
 
         return states
 

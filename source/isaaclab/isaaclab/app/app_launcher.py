@@ -297,7 +297,7 @@ class AppLauncher:
     """
 
     _APPLAUNCHER_CFG_INFO: dict[str, tuple[list[type], Any]] = {
-        "headless": ([bool], False),
+        "headless": ([bool], True),
         "livestream": ([int], -1),
         "enable_cameras": ([bool], False),
         "device": ([str], "cuda:0"),
