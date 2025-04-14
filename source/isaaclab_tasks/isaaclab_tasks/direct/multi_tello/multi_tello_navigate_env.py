@@ -296,9 +296,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # Update Agent States
         self._compute_intermediate_values()
         # reset when out of height or collision
-        max_height, _ = torch.max(self.h)
-        min_height, _ = torch.min(self.h) 
-        min_dist, _ = torch.min(self.d)
+        max_height, _ = torch.max(self.h, dim=-1)
+        min_height, _ = torch.min(self.h, dim=-1) 
+        min_dist, _ = torch.min(self.d, dim=-1)
         out_of_height = torch.logical_or(max_height > 3.0, min_height < 0.1)
         collision = torch.min(min_dist) < 0.25
         truncation = torch.logical_or(out_of_height, collision)
