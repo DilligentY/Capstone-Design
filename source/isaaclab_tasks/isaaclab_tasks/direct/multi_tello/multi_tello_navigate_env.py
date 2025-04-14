@@ -296,8 +296,11 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # Update Agent States
         self._compute_intermediate_values()
         # reset when out of height or collision
-        out_of_height = torch.logical_or(torch.max(self.h) > 2.0, torch.min(self.h) < 0.1)
-        collision = torch.min(self.d) < 0.25
+        max_height, _ = torch.max(self.h)
+        min_height, _ = torch.min(self.h) 
+        min_dist, _ = torch.min(self.d)
+        out_of_height = torch.logical_or(max_height > 3.0, min_height < 0.1)
+        collision = torch.min(min_dist) < 0.25
         truncation = torch.logical_or(out_of_height, collision)
         # reset when episode ends
         time_out = self.episode_length_buf >= self.max_episode_length - 1
@@ -394,11 +397,11 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.leader_to_right_pos, self.leader_to_right_rot = subtract_frame_transforms(self.leader_pos_w, self.leader_rot_w, 
                                                                                        self.right_pos_w, self.right_rot_w)
         # data for quadrotor's States
-        self.dist_leader_left = torch.linalg.norm(self.leader_pos_w - self.left_pos_w, dim=-1)
-        self.dist_leader_right = torch.linalg.norm(self.leader_pos_w - self.right_pos_w, dim=-1)
+        self.dist_leader_left = torch.linalg.norm(self.leader_pos_w - self.left_pos_w, dim=-1).reshape(self.num_envs, 1)
+        self.dist_leader_right = torch.linalg.norm(self.leader_pos_w - self.right_pos_w, dim=-1).reshape(self.num_envs, 1)
 
         # data for Done & Reward calculation
-        self.d = torch.cat((self.leader_to_left_pos, self.leader_to_right_pos), dim=-1)
+        self.d = torch.hstack((self.dist_leader_left, self.dist_leader_right))
         self.h = torch.cat((self.leader_altitude_w, self.left_altitude_w, self.right_altitude_w), dim=-1)
 
     
