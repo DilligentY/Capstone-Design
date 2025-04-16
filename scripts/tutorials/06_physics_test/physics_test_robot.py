@@ -128,6 +128,7 @@ def main():
     # Load kit helper
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim = SimulationContext(sim_cfg)
+    sim_dt = sim.get_physics_dt()
     # Set main camera
     sim.set_camera_view([2.5, 0.0, 2.5])
     # Design scene
@@ -135,11 +136,13 @@ def main():
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()
+    scene.reset()
     # Now we are ready!
     print("[INFO]: Setup complete...")
     # Run the simulator
-    while simulation_app.is_runnning():
+    while simulation_app.is_running():
         sim.step()
+        scene.update(sim_dt)
 
 if __name__ == "__main__":
     try:
