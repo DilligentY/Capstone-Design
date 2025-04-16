@@ -71,7 +71,7 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
 
     right_robot_cfg   : ArticulationCfg = TELLOAPPROX_CFG.replace(prim_path="/World/envs/env_.*/Follower_right").replace(
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.5, 0.5, 0.5),
+            pos=(-0.5, 0.5, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
         )
     )
@@ -129,7 +129,7 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
 
     # reset
     reset_position_noise = 0.1  # range of position at reset
-    reset_dof_pos_noise = 0.2  # range of dof pos at reset
+    reset_dof_pos_noise = 0.0  # range of dof pos at reset
     reset_dof_vel_noise = 0.0  # range of dof vel at reset
     # robot constant parameters
     thrust_to_weight = 1.7

@@ -40,7 +40,7 @@ memory:
 # https://skrl.readthedocs.io/en/latest/api/multi_agents/mappo.html
 agent:
   class: MAPPO
-  rollouts: 32
+  rollouts: 16
   learning_epochs: 5
   mini_batches: 4
   discount_factor: 0.99
@@ -78,5 +78,5 @@ agent:
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html
 trainer:
   class: SequentialTrainer
-  timesteps: 48000
+  timesteps: 4800
   environment_info: log
