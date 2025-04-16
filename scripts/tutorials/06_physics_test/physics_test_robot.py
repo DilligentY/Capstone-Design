@@ -132,15 +132,15 @@ def main():
         },
     )
     goal_marker = VisualizationMarkers(goal_object_cfg)
-    goal_pose = torch.tensor([1, 1, 1], dtype=torch.float)
-    goal_rot = torch.tensor([1, 0, 0, 0], dtype=torch.float)
     # Design scene
     scene_cfg = RobotSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()
     scene.reset()
-    goal_pose[:2] += scene.env_origins
+    goal_pose = torch.tensor([1, 1, 1], dtype=torch.float, device=scene.device).reshape(args_cli.num_envs, 3)
+    goal_rot = torch.tensor([1, 0, 0, 0], dtype=torch.float, device=scene.device).reshape(args_cli.num_envs, 4)
+    goal_pose[0, :2] += scene.env_origins[0, :2]
     goal_marker.visualize(goal_pose, goal_rot)
     # Now we are ready!
     print("[INFO]: Setup complete...")
