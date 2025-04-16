@@ -38,7 +38,7 @@ import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, RigidObject, RigidObjectCfg
 from isaaclab.sim import SimulationContext
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-from isaaclab.markers import VisualizationMarkersCfg
+from isaaclab.markers import VisualizationMarkersCfg, VisualizationMarkers
 from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
 from isaaclab.sensors.camera import Camera, CameraCfg
@@ -46,7 +46,7 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.utils import configclass
 
 @configclass
-class RobotSceneCfg(InteractiveScene):
+class RobotSceneCfg(InteractiveSceneCfg):
     """Design the scene Implicit Actuators on the robot."""
     
     # ground plane
@@ -107,16 +107,6 @@ class RobotSceneCfg(InteractiveScene):
             ),
         },
     )
-    # goal object
-    goal_object_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
-        prim_path="/Visuals/goal_marker",
-        markers={
-            "goal": sim_utils.SphereCfg(
-                radius=0.0335,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.4, 0.3, 1.0)),
-            ),
-        },
-    )
     
     
 def run_simulator():
@@ -130,13 +120,28 @@ def main():
     sim = SimulationContext(sim_cfg)
     sim_dt = sim.get_physics_dt()
     # Set main camera
-    sim.set_camera_view([2.5, 0.0, 2.5])
+    sim.set_camera_view([2.5, 0.0, 2.5], [0.0, 0.0, 2.0])
+    # Set goal point
+    goal_object_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/goal_marker",
+        markers={
+            "goal": sim_utils.SphereCfg(
+                radius=0.0335,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.4, 0.3, 1.0)),
+            ),
+        },
+    )
+    goal_marker = VisualizationMarkers(goal_object_cfg)
+    goal_pose = torch.tensor([1, 1, 1], dtype=torch.float)
+    goal_rot = torch.tensor([1, 0, 0, 0], dtype=torch.float)
     # Design scene
     scene_cfg = RobotSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()
     scene.reset()
+    goal_pose[:2] += scene.env_origins
+    goal_marker.visualize(goal_pose, goal_rot)
     # Now we are ready!
     print("[INFO]: Setup complete...")
     # Run the simulator
@@ -145,7 +150,5 @@ def main():
         scene.update(sim_dt)
 
 if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        simulation_app.close()
+    main()
+    simulation_app.close()
