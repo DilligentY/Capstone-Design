@@ -73,7 +73,7 @@ class FrankaCabinetEnvCfg(DirectRLEnvCfg):
                 "panda_joint7": 0.469,
                 "panda_finger_joint.*": 0.035,
             },
-            pos=(1.0, 0.0, 0.0),
+            pos=(0.0, 0.0, 0.0),
             rot=(0.0, 0.0, 0.0, 1.0),
         ),
         actuators={

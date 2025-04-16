@@ -48,7 +48,6 @@ from isaaclab.utils import configclass
 @configclass
 class RobotSceneCfg(InteractiveSceneCfg):
     """Design the scene Implicit Actuators on the robot."""
-    
     # ground plane
     ground = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg())
     # lights
@@ -80,7 +79,7 @@ class RobotSceneCfg(InteractiveSceneCfg):
                 "panda_joint7": 0.469,
                 "panda_finger_joint.*": 0.035,
             },
-            pos=(1.0, 0.0, 0.0),
+            pos=(0.0, 0.0, 0.0),
             rot=(0.0, 0.0, 0.0, 1.0),
         ),
         actuators={
@@ -108,11 +107,9 @@ class RobotSceneCfg(InteractiveSceneCfg):
         },
     )
     
-    
 def run_simulator():
     pass
 
-    
 def main():
     """Main function."""
     # Load kit helper
@@ -125,16 +122,15 @@ def main():
     goal_object_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
         prim_path="/Visuals/goal_marker",
         markers={
-            "goal": sim_utils.SphereCfg(
-                radius=0.0335,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.4, 0.3, 1.0)),
-            ),
+            "goal": sim_utils.SphereCfg(radius=0.0335, visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.4, 0.3, 1.0)))
         },
     )
     goal_marker = VisualizationMarkers(goal_object_cfg)
+    
     # Design scene
     scene_cfg = RobotSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
+    
     # Play the simulator
     sim.reset()
     scene.reset()
