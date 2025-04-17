@@ -26,7 +26,7 @@ from isaaclab.utils import configclass
 class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     # env
     decimation = 2
-    episode_length_s = 10.0
+    episode_length_s = 20.0
     possible_agents = ["leader", "left", "right"]
     action_spaces = {"leader" : 4, "left" : 4, "right" : 4}
     observation_spaces = {"leader" : 14, "left" : 21, "right" : 21}
@@ -97,42 +97,51 @@ class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
         )
     )
 
-    # Camera Sensor
-    # leader_camera = CameraCfg(
-    #     prim_path=f"{leader_robot_cfg.prim_path}/leader_cam",
-    #     update_period=0.1,
-    #     height=480,
-    #     width=640,
-    #     data_types=["rgb"],
-    #     spawn=sim_utils.PinholeCameraCfg(
-    #         focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
-    #     ),
-    #     offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
-    # )
-
-    # left_camera = CameraCfg(
-    #     prim_path=f"{left_robot_cfg.prim_path}/left_cam",
-    #     update_period=0.1,
-    #     height=480,
-    #     width=640,
-    #     data_types=["rgb"],
-    #     spawn=sim_utils.PinholeCameraCfg(
-    #         focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
-    #     ),
-    #     offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
-    # )
-
-    # right_camera = CameraCfg(
-    #     prim_path=f"{right_robot_cfg.prim_path}/right_cam",
-    #     update_period=0.1,
-    #     height=480,
-    #     width=640,
-    #     data_types=["rgb"],
-    #     spawn=sim_utils.PinholeCameraCfg(
-    #         focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
-    #     ),
-    #     offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
-    # )
+    # sensors
+    leader_camera = CameraCfg(
+        prim_path="/World/envs/env_.*/Leader/body/leader_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        colorize_instance_id_segmentation=False,
+        colorize_instance_segmentation=False,
+        colorize_semantic_segmentation=False,
+    )
+    
+    left_camera = CameraCfg(
+        prim_path="/World/envs/env_.*/Follower_left/body/left_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        colorize_instance_id_segmentation=False,
+        colorize_instance_segmentation=False,
+        colorize_semantic_segmentation=False,
+    )
+    
+    right_camera = CameraCfg(
+        prim_path="/World/envs/env_.*/Follower_right/body/right_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        colorize_instance_id_segmentation=False,
+        colorize_instance_segmentation=False,
+        colorize_semantic_segmentation=False,
+    )
     
     
     # goal object

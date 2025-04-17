@@ -69,9 +69,9 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
 
     def _setup_scene(self):
         # add hand, in-hand object, and goal object
-        self.leader = Articulation(self.cfg.leader_robot_cfg)
-        self.left = Articulation(self.cfg.left_robot_cfg)
-        self.right = Articulation(self.cfg.right_robot_cfg)
+        self.leader = Articulation(self.cfg.leader_robot)
+        self.left = Articulation(self.cfg.left_robot)
+        self.right = Articulation(self.cfg.right_robot)
         
         # add ground plane & terrain
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
@@ -132,14 +132,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.left_vel[:, 5] = approx_responses[:, 7] + (self._gravity_magnitude * self.physics_dt)
         self.right_vel[:, :3] = approx_responses[:, 8:11]
         self.right_vel[:, 5] = approx_responses[:, 11] + (self._gravity_magnitude * self.physics_dt)
-        # print(f"Current Leader Vel : {current_vel[0, :4]}")
-        # print(f"Current Left Vel : {current_vel[0, 4:8]}")
-        # print(f"Current Right Vel : {current_vel[0, 8:12]}")
-        # print(f"Next Leader Input : {self.leader_vel[0, :]}")
-        # print(f"Next Left Input : {self.left_vel[0, :]}")
-        # print(f"Next right Input : {self.right_vel[0, :]}")
-
-        # Insert velocity value
+        # Insert velocity input
         self.leader.write_root_velocity_to_sim(self.leader_vel)
         self.left.write_root_velocity_to_sim(self.left_vel)
         self.right.write_root_velocity_to_sim(self.right_vel)
@@ -266,15 +259,11 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         ang_vel_left = torch.sum(torch.square(self.left_ang_vel_b), dim=1)
         distance_to_ideal_left_line = torch.linalg.norm(self.ideal_left_line - self.leader_to_left_pos, dim=1)
         distance_to_ideal_left_line_mapped = torch.exp(-distance_to_ideal_left_line)
-        # attitude_to_leader_left = quat_error_magnitude(self.left_rot_w, self.leader_rot_w)
-        # attitude_to_leader_left_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_left / torch.pi))
         # compute Right Reward
         lin_vel_right = torch.sum(torch.square(self.right_lin_vel_b), dim=1)
         ang_vel_right = torch.sum(torch.square(self.right_ang_vel_b), dim=1)
         distance_to_ideal_right_line = torch.linalg.norm(self.ideal_right_line - self.leader_to_right_pos, dim=1)
         distance_to_ideal_right_line_mapped = torch.exp(-distance_to_ideal_right_line)
-        # attitude_to_leader_right = quat_error_magnitude(self.right_rot_w, self.leader_rot_w)
-        # attitude_to_leader_right_mapped = 1 / (1 + self.cfg.attitude_to_follower_reward_scale_1 * (attitude_to_leader_right / torch.pi))
 
         # make Reward Dictionary
         reward = {
@@ -346,7 +335,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # reset goals
         self._reset_target_pose(env_ids)
 
-        # reset Leader, Follower Quadrotor and add noise to position
+        # Reset Leader, Follower Quadrotor and add noise to position
         for robot in self.scene.articulations.values():
             joint_pos = robot.data.default_joint_pos[env_ids]
             joint_vel = robot.data.default_joint_vel[env_ids]
@@ -375,7 +364,6 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # object_default_state[:, 7:] = torch.zeros_like(self.object.data.default_root_state[env_ids, 7:])
         # self.object.write_root_pose_to_sim(object_default_state[:, :7], env_ids)
         # self.object.write_root_velocity_to_sim(object_default_state[:, 7:], env_ids)
-
 
     def _reset_target_pose(self, env_ids):
         # reset only goal position
@@ -440,6 +428,6 @@ def randomize_rotation(rand0, rand1, x_unit_tensor, y_unit_tensor):
     )
 
 torch.jit.script
-def Low_Pass_Filter(current_value, target_value, omega=1/0.001, dt=0.01):
+def Low_Pass_Filter(current_value, target_value, omega=1/0.005, dt=0.01):
     coeff = 1/(1 + omega * dt)
     return coeff * (current_value + omega * dt * target_value)

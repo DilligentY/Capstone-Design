@@ -184,7 +184,7 @@ def main():
     for key in scene.keys():
         if key in arti_key:
             robot = scene[key]
-            scene.articulations[key] = robot   
+            scene.articulations[key] = robot 
     
     sim.reset()
     print("[INFO]: Setup complete...")
