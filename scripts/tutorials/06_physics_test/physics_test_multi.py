@@ -109,7 +109,7 @@ def run_simulator(sim : SimulationContext, scene : InteractiveScene):
             count = 0
             _reset(scene)
         
-        
+        count += 1
         scene.write_data_to_sim()
         sim.step()
         scene.update(sim_dt)

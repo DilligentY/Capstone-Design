@@ -156,19 +156,19 @@ def run_simulator(sim : SimulationContext, scene : InteractiveScene):
             count = 0
             _reset(scene)
         
-        
+        count += 1
         scene.write_data_to_sim()
         sim.step()
         scene.update(sim_dt)
         
-        print("-------------------------------")
-        print(scene["leader_camera"])
-        print("Received shape of rgb   image: ", scene["leader_camera"].data.output["rgb"].shape)
-        print(scene["left_camera"])
-        print("Received shape of rgb   image: ", scene["left_camera"].data.output["rgb"].shape)
-        print(scene["right_camera"])
-        print("Received shape of rgb   image: ", scene["right_camera"].data.output["rgb"].shape)
-        print("-------------------------------")
+        # print("-------------------------------")
+        # print(scene["leader_camera"])
+        # print("Received shape of rgb   image: ", scene["leader_camera"].data.output["rgb"].shape)
+        # print(scene["left_camera"])
+        # print("Received shape of rgb   image: ", scene["left_camera"].data.output["rgb"].shape)
+        # print(scene["right_camera"])
+        # print("Received shape of rgb   image: ", scene["right_camera"].data.output["rgb"].shape)
+        # print("-------------------------------")
         
     
 
