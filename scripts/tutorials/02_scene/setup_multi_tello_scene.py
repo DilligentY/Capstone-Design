@@ -120,3 +120,7 @@ def main():
     run_simulator(sim, scene)
     
 
+
+if __name__ == "__main__":
+    main()
+    simulation_app.close()
