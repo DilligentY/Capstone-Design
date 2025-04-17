@@ -144,8 +144,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene : InteractiveScene):
         robot.set_external_force_and_torque(_thrust, _torque, body_ids=tello_body, env_ids=env_id)
         # -- write data to sim
         robot.write_data_to_sim()
-        
-        object
+    
         # Perform step
         sim.step()
         # Increment counter

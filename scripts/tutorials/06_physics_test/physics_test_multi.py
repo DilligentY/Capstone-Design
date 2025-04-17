@@ -78,13 +78,7 @@ class MultiDroneSecneCfg(InteractiveSceneCfg):
     )
     
     
-
-def run_simulator(sim : SimulationContext, scene : InteractiveScene):
-    leader = scene.articulations["leader_robot"]
-    left = scene.articulations["left_robot"]
-    right = scene.articulations["right_robot"]
-    sim_dt = sim.get_physics_dt()
-    
+def _reset(scene : InteractiveScene):
     for robot in scene.articulations.values():
         robot.reset()
         joint_pos = robot.data.default_joint_pos.clone()
@@ -94,8 +88,28 @@ def run_simulator(sim : SimulationContext, scene : InteractiveScene):
         robot.write_joint_state_to_sim(joint_pos, joint_vel)
         robot.write_root_pose_to_sim(default_root_state[:, :7])
         robot.write_root_velocity_to_sim(default_root_state[:, 7:])
+    scene.reset()
+    print("[INFO] : Reset Complete")
+    
+
+
+def run_simulator(sim : SimulationContext, scene : InteractiveScene):
+    sim_dt = sim.get_physics_dt()
+    count = 0
+    leader = scene.articulations["leader_robot"]
+    left = scene.articulations["left_robot"]
+    right = scene.articulations["right_robot"]
+    
+    leader_body = leader.find_bodies("body")[0]
+    left_body = left.find_bodies("body")[0]
+    right_body = right.find_bodies("body")[0]
     
     while simulation_app.is_running():
+        if count % 500 == 0:
+            count = 0
+            _reset(scene)
+        
+        
         scene.write_data_to_sim()
         sim.step()
         scene.update(sim_dt)

@@ -77,14 +77,55 @@ class MultiDroneSecneCfg(InteractiveSceneCfg):
         )
     )
     
+    # sensors
+    leader_camera = CameraCfg(
+        prim_path="/World/envs/env_.*/Leader/body/leader_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        colorize_instance_id_segmentation=False,
+        colorize_instance_segmentation=False,
+        colorize_semantic_segmentation=False,
+    )
     
-
-def run_simulator(sim : SimulationContext, scene : InteractiveScene):
-    leader = scene.articulations["leader_robot"]
-    left = scene.articulations["left_robot"]
-    right = scene.articulations["right_robot"]
-    sim_dt = sim.get_physics_dt()
+    left_camera = CameraCfg(
+        prim_path="/World/envs/env_.*/Follower_left/body/left_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        colorize_instance_id_segmentation=False,
+        colorize_instance_segmentation=False,
+        colorize_semantic_segmentation=False,
+    )
     
+    right_camera = CameraCfg(
+        prim_path="/World/envs/env_.*/Follower_right/body/right_cam",
+        update_period=0.1,
+        height=480,
+        width=640,
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+        ),
+        offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        colorize_instance_id_segmentation=False,
+        colorize_instance_segmentation=False,
+        colorize_semantic_segmentation=False,
+    )
+    
+    
+    
+def _reset(scene : InteractiveScene):
     for robot in scene.articulations.values():
         robot.reset()
         joint_pos = robot.data.default_joint_pos.clone()
@@ -94,11 +135,40 @@ def run_simulator(sim : SimulationContext, scene : InteractiveScene):
         robot.write_joint_state_to_sim(joint_pos, joint_vel)
         robot.write_root_pose_to_sim(default_root_state[:, :7])
         robot.write_root_velocity_to_sim(default_root_state[:, 7:])
+    scene.reset()
+    print("[INFO] : Reset Complete")
+    
+
+
+def run_simulator(sim : SimulationContext, scene : InteractiveScene):
+    sim_dt = sim.get_physics_dt()
+    count = 0
+    leader = scene.articulations["leader_robot"]
+    left = scene.articulations["left_robot"]
+    right = scene.articulations["right_robot"]
+    
+    leader_body = leader.find_bodies("body")[0]
+    left_body = left.find_bodies("body")[0]
+    right_body = right.find_bodies("body")[0]
     
     while simulation_app.is_running():
+        if count % 500 == 0:
+            count = 0
+            _reset(scene)
+        
+        
         scene.write_data_to_sim()
         sim.step()
         scene.update(sim_dt)
+        
+        print("-------------------------------")
+        print(scene["leader_camera"])
+        print("Received shape of rgb   image: ", scene["leader_camera"].data.output["rgb"].shape)
+        print(scene["left_camera"])
+        print("Received shape of rgb   image: ", scene["left_camera"].data.output["rgb"].shape)
+        print(scene["right_camera"])
+        print("Received shape of rgb   image: ", scene["right_camera"].data.output["rgb"].shape)
+        print("-------------------------------")
         
     
 
