@@ -95,7 +95,6 @@ def run_simulator(sim : SimulationContext, scene : InteractiveScene):
         robot.write_root_pose_to_sim(default_root_state[:, :7])
         robot.write_root_velocity_to_sim(default_root_state[:, 7:])
     
-    
     while simulation_app.is_running():
         sim.step()
         scene.update(sim_dt)
@@ -103,6 +102,7 @@ def run_simulator(sim : SimulationContext, scene : InteractiveScene):
     
 
 def main():
+    arti_key = ["leader_robot", "left_robot", "right_robot"]
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim = SimulationContext(sim_cfg)
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
@@ -111,8 +111,9 @@ def main():
     scene = InteractiveScene(scene_cfg)
 
     for key in scene.keys():
-        robot = scene[key]
-        scene.articulations[key] = robot    
+        if key in arti_key:
+            robot = scene[key]
+            scene.articulations[key] = robot   
     
     sim.reset()
     print("[INFO]: Setup complete...")
