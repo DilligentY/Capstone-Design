@@ -95,6 +95,7 @@ def run_simulator(sim : SimulationContext, scene : InteractiveScene):
         robot.write_root_pose_to_sim(default_root_state[:, :7])
         robot.write_root_velocity_to_sim(default_root_state[:, 7:])
     
+    
     while simulation_app.is_running():
         sim.step()
         scene.update(sim_dt)
