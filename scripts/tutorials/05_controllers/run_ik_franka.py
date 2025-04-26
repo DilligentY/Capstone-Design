@@ -46,10 +46,8 @@ from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
-
 from isaaclab.utils import configclass
 from isaaclab.utils.math import subtract_frame_transforms
-
 
 
 @configclass
@@ -65,7 +63,7 @@ class RobotSceneCfg(InteractiveSceneCfg):
     dome_light = AssetBaseCfg(
         prim_path="/World/Light", spawn=sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
     )
-    # tabke
+    # table
     table = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Table",
         spawn=sim_utils.UsdFileCfg(
@@ -142,7 +140,6 @@ def run_simulator(sim : sim_utils.SimulationContext, scene : InteractiveScene):
         goal_marker.visualize(ik_commands[:, :3] + scene.env_origins + robot.data.default_root_state[:, :3], ik_commands[:, 3:7])
 
 
-
 def main():
     """Main function."""
     # Load kit helper
@@ -154,7 +151,6 @@ def main():
     # Design scene
     scene_cfg = RobotSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
-    
     # Play the simulator
     sim.reset()
     # Now we are ready!

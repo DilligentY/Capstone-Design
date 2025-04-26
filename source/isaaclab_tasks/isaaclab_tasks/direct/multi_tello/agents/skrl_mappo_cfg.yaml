@@ -15,7 +15,7 @@ models:
     network:
       - name: net
         input: STATES
-        layers: [256, 256, 128, 128]
+        layers: [128, 128, 64, 64]
         activations: elu
     output: ACTIONS
   value:  # see deterministic_model parameters
@@ -24,7 +24,7 @@ models:
     network:
       - name: net
         input: STATES
-        layers: [256, 256, 128, 128]
+        layers: [128, 128, 64, 64]
         activations: elu
     output: ONE
 
@@ -40,7 +40,7 @@ memory:
 # https://skrl.readthedocs.io/en/latest/api/multi_agents/mappo.html
 agent:
   class: MAPPO
-  rollouts: 16
+  rollouts: 32
   learning_epochs: 5
   mini_batches: 4
   discount_factor: 0.99
@@ -78,5 +78,5 @@ agent:
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html
 trainer:
   class: SequentialTrainer
-  timesteps: 4800
+  timesteps: 14400
   environment_info: log

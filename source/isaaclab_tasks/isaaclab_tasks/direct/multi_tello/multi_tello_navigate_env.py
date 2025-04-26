@@ -33,12 +33,8 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.left_vel        = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
         self.right_vel       = torch.zeros((self.num_envs, 6), dtype=torch.float, device=self.device)
 
-        self.ideal_left_line    = torch.tensor((-0.5, -0.5, 0.0), dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
-        self.ideal_right_line   = torch.tensor(( 0.5,  0.5, 0.0), dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
-
-        # used to compare object position
-        # self.in_hand_pos = self.object.data.default_root_state[:, 0:3].clone()
-        # self.in_hand_pos[:, 2] -= 0.04
+        self.ideal_left_line    = torch.tensor((-0.3, -0.3, 0.0), dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
+        self.ideal_right_line   = torch.tensor((-0.3,  0.3, 0.0), dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
         
         # default goal positions
         self.goal_rot = torch.zeros((self.num_envs, 4), dtype=torch.float, device=self.device)
@@ -49,10 +45,10 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         self.goal_markers = VisualizationMarkers(self.cfg.goal_object_cfg)
 
         # unit tensors
-        self.x_unit_tensor = torch.tensor([1, 0, 0], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
-        self.y_unit_tensor = torch.tensor([0, 1, 0], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
-        self.z_unit_tensor = torch.tensor([0, 0, 1], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
-        self.action_scale = torch.tensor([self.cfg.max_lin_vel_x, 
+        self.x_unit_tensor  = torch.tensor([1, 0, 0], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
+        self.y_unit_tensor  = torch.tensor([0, 1, 0], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
+        self.z_unit_tensor  = torch.tensor([0, 0, 1], dtype=torch.float, device=self.device).repeat((self.num_envs, 1))
+        self.action_scale   = torch.tensor([self.cfg.max_lin_vel_x, 
                                              self.cfg.max_lin_vel_y,
                                              self.cfg.max_lin_vel_z,
                                              self.cfg.max_ang_vel_z], device=self.device).repeat((self.num_envs, 1))
@@ -305,9 +301,13 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         max_height, _ = torch.max(self.h, dim=-1)
         min_height, _ = torch.min(self.h, dim=-1) 
         min_dist, _ = torch.min(self.d, dim=-1)
+        max_dist, _ = torch.max(self.d, dim=-1)
+
+        out_of_sight = max_dist > 2
         out_of_height = torch.logical_or(max_height > 3.0, min_height < 0.1)
-        collision = torch.min(min_dist) < 0.25
-        truncation = torch.logical_or(out_of_height, collision)
+        dist_condition = torch.logical_or(out_of_height, out_of_sight)
+        collision_condition = torch.min(min_dist) < 0.25
+        truncation = torch.logical_or(dist_condition, collision_condition)
         # reset when episode ends
         time_out = self.episode_length_buf >= self.max_episode_length - 1
 
@@ -368,7 +368,7 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
     def _reset_target_pose(self, env_ids):
         # reset only goal position
         self.goal_pos[env_ids, :2]  = torch.zeros_like(self.goal_pos[env_ids, :2])
-        self.goal_pos[env_ids, :2] += self._terrain.env_origins[env_ids, :2]
+        self.goal_pos[env_ids, :2] += self.scene.env_origins[env_ids, :2]
         self.goal_pos[env_ids, 2] = torch.zeros_like(self.goal_pos[env_ids, 2]).uniform_(1.0, 1.5)
 
         # update goal pose and markers
@@ -404,6 +404,11 @@ class MultiTelloNavigateEnv(DirectMARLEnv):
         # data for quadrotor's States
         self.dist_leader_left = torch.linalg.norm(self.leader_pos_w - self.left_pos_w, dim=-1).reshape(self.num_envs, 1)
         self.dist_leader_right = torch.linalg.norm(self.leader_pos_w - self.right_pos_w, dim=-1).reshape(self.num_envs, 1)
+
+        # print("------------------------------")
+        # print(f"distance from leader to left : {self.dist_leader_left}")
+        # print(f"distance from leader to right : {self.dist_leader_right}")
+        # print("------------------------------")
 
         # data for Done & Reward calculation
         self.d = torch.hstack((self.dist_leader_left, self.dist_leader_right))

@@ -290,11 +290,11 @@ class DirectMARLEnv(gym.Env):
             The agent's action space.
         """
         return self.action_spaces[agent]
-
+    
     """
     Operations.
     """
-
+    
     def reset(
         self, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[dict[AgentID, ObsType], dict[AgentID, dict]]:
