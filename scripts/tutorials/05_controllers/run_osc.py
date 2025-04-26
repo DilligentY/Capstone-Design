@@ -143,7 +143,6 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     frame_marker_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
     ee_marker = VisualizationMarkers(frame_marker_cfg.replace(prim_path="/Visuals/ee_current"))
     goal_marker = VisualizationMarkers(frame_marker_cfg.replace(prim_path="/Visuals/ee_goal"))
-
     # Define targets for the arm
     ee_goal_pose_set_tilted_b = torch.tensor(
         [
