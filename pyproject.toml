@@ -1,5 +1,5 @@
-# [tool.isort]
-[tool.pyright]
+[tool.isort]
+# [tool.pyright]
 
 py_version = 310
 line_length = 120

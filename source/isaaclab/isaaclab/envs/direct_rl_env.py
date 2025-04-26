@@ -34,7 +34,6 @@ from .direct_rl_env_cfg import DirectRLEnvCfg
 from .ui import ViewportCameraController
 from .utils.spaces import sample_space, spec_to_gym_space
 
-
 class DirectRLEnv(gym.Env):
     """The superclass for the direct workflow to design environments.
 
