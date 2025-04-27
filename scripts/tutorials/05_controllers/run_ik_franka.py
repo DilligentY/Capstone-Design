@@ -48,7 +48,6 @@ from isaaclab.controllers import DifferentialIKController, DifferentialIKControl
 from isaaclab.utils import configclass
 from isaaclab.utils.math import subtract_frame_transforms
 
-
 @configclass
 class RobotSceneCfg(InteractiveSceneCfg):
     """Design the scene Implicit Actuators on the robot."""
