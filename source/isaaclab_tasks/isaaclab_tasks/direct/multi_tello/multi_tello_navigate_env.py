@@ -18,7 +18,6 @@ from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul, sample_uniform, subtract_frame_transforms, quat_error_magnitude
 from .multi_tello_navigate_env_cfg import MultiTelloNavigateEnvCfg
 
-
 class MultiTelloNavigateEnv(DirectMARLEnv):
     cfg: MultiTelloNavigateEnvCfg
 

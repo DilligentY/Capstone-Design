@@ -22,6 +22,7 @@ from isaaclab.utils.noise import NoiseModelWithAdditiveBiasCfg, GaussianNoiseCfg
 from isaaclab.sensors import CameraCfg
 from isaaclab.utils import configclass
 
+
 @configclass
 class MultiTelloNavigateEnvCfg(DirectMARLEnvCfg):
     # env
