@@ -2,9 +2,6 @@ import open3d as o3d
 import open3d.core as o3c
 import numpy as np
 
-print("Testing kdtree in Open3D...")
-print("Load a point cloud and paint it gray.")
-
 # Load Point Cloud Data
 ply_point_cloud = o3d.data.PLYPointCloud()
 pcd = o3d.io.read_point_cloud("C:/Users/grape4314/open3d_data/download/PLYPointCloud/fragment.ply")
@@ -31,7 +28,7 @@ pcd_tree = o3d.geometry.KDTreeFlann(pcd)
 # KNN Search
 patches = list()
 print("Find it 50 nearest neighbors")
-for i in range(500):      
+for i in range(100):      
     [k, idx, _] = pcd_tree.search_knn_vector_3d(downpcd_fps.points[i], 50)
     points = pcd.select_by_index(idx)
     patches.append(points)
